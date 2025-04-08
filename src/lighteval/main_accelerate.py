@@ -20,13 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import logging
 import os
-from typing import Optional
+import logging
 
+from typing import Optional
 from typer import Argument, Option
 from typing_extensions import Annotated
-
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +102,10 @@ def accelerate(  # noqa C901
     """
     Evaluate models using accelerate and transformers as backend.
     """
-    from datetime import timedelta
-
-    import torch
     import yaml
+    import torch
+
+    from datetime import timedelta
     from accelerate import Accelerator, InitProcessGroupKwargs
 
     from lighteval.logging.evaluation_tracker import EvaluationTracker

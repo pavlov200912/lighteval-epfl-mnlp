@@ -127,6 +127,7 @@ class Registry:
         custom_tasks_registry = {}
         custom_tasks_module = []
         TASKS_TABLE = []
+
         if self._custom_tasks is not None:
             custom_tasks_module.append(create_custom_tasks_module(custom_tasks=self._custom_tasks))
         if can_load_extended_tasks():

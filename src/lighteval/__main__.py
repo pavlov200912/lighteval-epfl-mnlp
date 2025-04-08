@@ -19,6 +19,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+
 import logging
 import logging.config
 
@@ -27,12 +28,9 @@ import typer
 
 import lighteval.main_accelerate
 import lighteval.main_baseline
-import lighteval.main_endpoint
-import lighteval.main_nanotron
-import lighteval.main_sglang
 import lighteval.main_tasks
 import lighteval.main_vllm
-
+import lighteval.main_endpoint
 
 app = typer.Typer()
 app = typer.Typer(pretty_exceptions_show_locals=False)
@@ -64,9 +62,7 @@ logging.captureWarnings(capture=True)
 
 app.command(rich_help_panel="Evaluation Backends")(lighteval.main_accelerate.accelerate)
 app.command(rich_help_panel="Evaluation Utils")(lighteval.main_baseline.baseline)
-app.command(rich_help_panel="Evaluation Backends")(lighteval.main_nanotron.nanotron)
 app.command(rich_help_panel="Evaluation Backends")(lighteval.main_vllm.vllm)
-app.command(rich_help_panel="Evaluation Backends")(lighteval.main_sglang.sglang)
 app.add_typer(
     lighteval.main_endpoint.app,
     name="endpoint",
@@ -79,7 +75,6 @@ app.add_typer(
     rich_help_panel="Utils",
     help="List or inspect tasks.",
 )
-
 
 if __name__ == "__main__":
     app()
