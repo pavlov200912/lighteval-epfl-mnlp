@@ -94,6 +94,8 @@ class LightevalModel(ABC):
             return self.greedy_until
         if request_type == RequestType.GREEDY_UNTIL_MULTI_TURN:
             return self.greedy_until_multi_turn
+        if request_type == RequestType.DPO_INFERENCE:
+            return self.dpo_inference
         raise NotImplementedError(f"Request type {request_type} not supported")
 
     def greedy_until_multi_turn(  # noqa: C901

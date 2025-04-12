@@ -39,6 +39,17 @@ class ModelResponse:
 
 
 @dataclass
+class RewardModelingResponse(ModelResponse):
+    # Float: Reward scores for the chosen tokens and the rejected tokens
+    result: Union[tuple[float, float], float] = field(default_factory=tuple[float, float])
+    policy_chosen_logps: Optional[list[float]] = None
+    policy_rejected_logps: Optional[list[float]] = None
+
+    def get_result_for_eval(self):
+        return self.result
+
+
+@dataclass
 class LoglikelihoodResponse(ModelResponse):
     # Float: Total log prob of the continuation
     # Optional(Bool): Whether the continuation is greedy (= all the tokens in the continuation are argmax of prob)
@@ -81,3 +92,12 @@ class Batch:
     input_lengths: list[int]
     truncated: list[int]
     padded: list[int]
+
+@dataclass
+class DPOBatch:
+    chosen_input_ids: torch.Tensor
+    chosen_input_mask: torch.Tensor
+    chosen_labels: torch.Tensor
+    rejected_input_ids: torch.Tensor
+    rejected_input_mask: torch.Tensor
+    rejected_labels: torch.Tensor
