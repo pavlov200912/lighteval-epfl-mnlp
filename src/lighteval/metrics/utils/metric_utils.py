@@ -35,6 +35,7 @@ class MetricCategory(str, Enum):
     MULTICHOICE = auto()
     MULTICHOICE_PMI = auto()
     MULTICHOICE_ONE_TOKEN = auto()
+    REWARD_MODELING = auto()
     IGNORED = auto()
 
 
