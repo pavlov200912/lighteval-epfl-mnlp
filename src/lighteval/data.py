@@ -20,10 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from dataclasses import dataclass
 import logging
 import math
-from typing import Iterator, Tuple
+from typing import Any, Iterable, Iterator, List, Optional, Tuple, Union
 
+import numpy as np
 import torch
 from packaging import version
 from torch.utils.data import Dataset
@@ -40,6 +42,7 @@ from lighteval.tasks.requests import (
     LoglikelihoodRequest,
     LoglikelihoodRollingRequest,
     LoglikelihoodSingleTokenRequest,
+    DPOInferenceRequest,
     Request,
 )
 
@@ -214,7 +217,16 @@ class LoglikelihoodDataset(DynamicBatchDataset):
         Returns:
             tuple: A tuple containing the sorted input data.
         """
-        toks = request.tokenized_context + request.tokenized_continuation
+        if hasattr(request, "tokenized_continuation"):
+            # We take the full context + continuation
+            toks = request.tokenized_context + request.tokenized_continuation
+        elif hasattr(request, "chosen_input_ids") and hasattr(request, "rejected_input_ids"):
+            # We take the full context + chosen + reject
+            toks = request.tokenized_context + request.chosen_input_ids + request.rejected_input_ids
+        else:
+            raise ValueError(
+                "You passed a request for which tokenization had not happened yet. Please check your code."
+            )
         return -len(toks)
 
 
@@ -350,3 +362,175 @@ class GenDistributedSampler(DistributedSampler):
         assert len(indices) == self.num_samples
 
         return iter(indices)
+
+# NOTE: for JIT-compatibility, we need to be more restrictive here and use specific types instead of Iterable.
+def pad_sequence(
+    sequences: Union[torch.Tensor, List[torch.Tensor]],
+    batch_first: bool = False,
+    padding_value: float = 0.0,
+    padding_side: str = "right",
+) -> torch.Tensor:
+    r"""Pad a list of variable length Tensors with :attr:`padding_value`.
+
+    ``pad_sequence`` stacks a list of Tensors along a new dimension, and pads them
+    to equal length. :attr:`sequences` can be list of sequences with size ``L x *``,
+    where `L` is length of the sequence and ``*`` is any number of dimensions
+    (including 0). If :attr:`batch_first` is ``False``, the output is of size
+    ``T x B x *``, and ``B x T x *`` otherwise, where ``B`` is the batch size
+    (the number of elements in :attr:`sequences`), ``T`` is the length of the longest
+    sequence.
+
+    Example:
+        >>> from torch.nn.utils.rnn import pad_sequence
+        >>> a = torch.ones(25, 300)
+        >>> b = torch.ones(22, 300)
+        >>> c = torch.ones(15, 300)
+        >>> pad_sequence([a, b, c]).size()
+        torch.Size([25, 3, 300])
+
+    Note:
+        This function returns a Tensor of size ``T x B x *`` or ``B x T x *``
+        where `T` is the length of the longest sequence. This function assumes
+        trailing dimensions and type of all the Tensors in sequences are same.
+
+    Args:
+        sequences (list[Tensor]): list of variable length sequences.
+        batch_first (bool, optional): if ``True``, the output will be in ``B x T x *``
+            format, ``T x B x *`` otherwise.
+        padding_value (float, optional): value for padded elements. Default: 0.
+        padding_side (str, optional): the side to pad the sequences on.
+            Default: "right".
+
+    Returns:
+        Tensor of size ``T x B x *`` if :attr:`batch_first` is ``False``.
+        Tensor of size ``B x T x *`` otherwise
+    """
+    if not (torch.jit.is_tracing() or torch.jit.is_scripting()):
+        # JIT doesn't support `Iterable`
+        if not isinstance(sequences, Iterable):
+            msg = (
+                "pad_sequence: Expected iterable for input sequences, but got arg of type: "
+                f"{type(sequences)}"
+            )
+            raise RuntimeError(msg)
+
+        # In JIT context this leads to,
+        # RuntimeError: cannot statically infer the expected size of a list in this context
+        sequences = tuple(sequences)  # type: ignore[assignment]
+    else:
+        # For JIT, we only support Union[Tensor, Tuple[Tensor]]
+        if isinstance(sequences, torch.Tensor):
+            sequences = sequences.unbind(0)  # type: ignore[assignment]
+
+    # assuming trailing dimensions and type of all the Tensors
+    # in sequences are same and fetching those from sequences[0]
+    return torch._C._nn.pad_sequence(
+        sequences, batch_first, padding_value, padding_side  # type: ignore[arg-type]
+    )
+
+def pad(tensors: list[torch.Tensor], padding_value: int = 0, padding_side: str = "right") -> torch.Tensor:
+    """
+    Pads a list of tensors to the same shape along the first dimension.
+
+    Args:
+        tensors (`list[torch.Tensor]`):
+            List of input tensors to pad.
+        padding_value (`int`):
+            Value to use for padding. Default is 0.
+        padding_side (`str`):
+            Side on which to add padding. Must be 'left' or 'right'. Default is 'right'.
+
+    Returns:
+        `torch.Tensor`:
+            A single tensor containing the padded tensors.
+
+    Examples:
+        >>> import torch
+        >>> pad([torch.tensor([1, 2, 3]), torch.tensor([4, 5])])
+        tensor([[1, 2, 3],
+                [4, 5, 0]])
+        >>> pad([torch.tensor([[1, 2], [3, 4]]), torch.tensor([[5, 6]])])
+        tensor([[[1, 2],
+                [3, 4]],
+
+                [[5, 6],
+                [0, 0]]])
+    """
+    # Determine the maximum shape for each dimension
+    output_shape = np.max([t.shape for t in tensors], 0).tolist()
+
+    # Create an output tensor filled with the padding value
+    output = torch.full((len(tensors), *output_shape), padding_value, dtype=tensors[0].dtype, device=tensors[0].device)
+
+    for i, t in enumerate(tensors):
+        # Determine the slice for the sequence dimension
+        if padding_side == "left":
+            seq_slice = slice(output_shape[0] - t.shape[0], output_shape[0])
+        elif padding_side == "right":
+            seq_slice = slice(0, t.shape[0])
+        else:
+            raise ValueError("padding_side must be 'left' or 'right'")
+
+        slices = (seq_slice,) + tuple(slice(0, s) for s in t.shape[1:])
+        output[i][slices] = t
+
+    return output
+
+@dataclass
+class DPODataCollatorWithPadding:
+    r"""
+    DPO DataCollator class that pads the tokenized inputs to the maximum length of the batch.
+
+    Args:
+        pad_token_id (`int` defaults to 0):
+            The tokenizer's pad_token_id.
+        label_pad_token_id (`int`, defaults to -100):
+            The label used for masking.
+        is_encoder_decoder (`bool` or `None`, `optional`, defaults to `None`):
+            Whether you model has an encoder_decoder architecture.
+    """
+
+    pad_token_id: int = 0
+    label_pad_token_id: int = -100
+
+    def __call__(self, reqeusts: list[DPOInferenceRequest]) -> dict[str, Any]:
+        features = [vars(request) for request in reqeusts]
+        padded_batch = {}
+        for k in features[0].keys():
+            if k.endswith(("_input_ids", "_attention_mask", "_labels", "_pixel_values")):
+                # Set padding value based on the key
+                if k.endswith("_input_ids"):
+                    if self.pad_token_id is None:
+                        raise ValueError(
+                            "Padding is enabled, but the tokenizer is not configured with a padding token."
+                            " Explicitly set `tokenizer.pad_token` (e.g. `tokenizer.pad_token = tokenizer.eos_token`)"
+                            " before calling the trainer."
+                        )
+                    padding_value = self.pad_token_id
+                elif k.endswith("_labels"):
+                    padding_value = self.label_pad_token_id
+                elif k.endswith("_attention_mask"):
+                    padding_value = 0
+                elif k.endswith("_pixel_values"):
+                    padding_value = 0  # TODO: check if this is correct
+                else:
+                    raise ValueError(f"Unexpected key in batch '{k}'")
+
+                # Set padding side based on the key
+                if k in ["prompt_input_ids", "prompt_attention_mask"]:
+                    padding_side = "left"
+                else:
+                    padding_side = "right"
+
+                if k.endswith("_pixel_values"):
+                    dtype = torch.float32  # will be downcasted if necessary by the Trainer
+                else:
+                    dtype = torch.int64
+                to_pad = [torch.tensor(ex[k], dtype=dtype) for ex in features]
+                padded_batch[k] = pad(to_pad, padding_value=padding_value, padding_side=padding_side)
+            elif k.endswith("_logps") and features[0][k] is not None:
+                padded_batch[k] = torch.tensor([ex[k] for ex in features])
+            else:
+                padded_batch[k] = [ex[k] for ex in features]
+
+        return padded_batch
