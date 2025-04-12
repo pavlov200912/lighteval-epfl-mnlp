@@ -56,6 +56,58 @@ from lighteval.utils.utils import as_list, safe_divide
 logger = logging.getLogger(__name__)
 
 
+class RewardModelingAcc:
+    def __init__(
+        self,
+        aggregation_function: Callable[[list[float]], float] = max
+    ):
+        """A reward modeling accuracy class. It tests if the chosen continuation has a higher reward than the rejected one.
+
+        Args:
+            aggregation_function (callable, optional): How to aggregate the item results. Defaults to max.
+                Used if there are several golds or predictions on which scores were computed.
+            chosen_reward (callable, optional): Function to use to normalize the reference strings.
+
+        """
+        self.aggregation_function = aggregation_function
+
+    def compute(self, chosen_rewards: list[float], reject_rewards: list[float], **kwargs) -> float:
+        """Computes the metric over a list of golds and predictions for one single sample.
+
+        Args:
+            chosen_rewards (list[float]): Rewards computed for the chosen continuations
+            reject_rewards (list[float]): Rewards computed for the rejected continuations
+
+        Returns:
+            float: Aggregated score over the current sample's items.
+        """
+        results = []
+        for chosen_reward, reject_reward in zip(chosen_rewards, reject_rewards):
+            results.append(self.compute_one_item(
+                chosen_reward=chosen_reward,
+                reject_reward=reject_reward))
+        return self.aggregation_function(results)
+
+    def compute_one_item(
+        self,
+        chosen_reward: float,
+        reject_reward: float
+    ) -> float:
+        """Compares two strings only.
+
+        Args:
+            chosen_reward (float): One reward computed for a chosen continuation
+            reject_reward (float): One reward computed for a rejected continuation
+
+        Returns:
+            float: The success indicator of reward modeling. Will be 1 if the chosen reward is higher than the rejected one, 0 otherwise.
+        """
+        if chosen_reward >= reject_reward:
+            return 1
+        else:
+            return 0
+
+
 class ExactMatches:
     def __init__(
         self,

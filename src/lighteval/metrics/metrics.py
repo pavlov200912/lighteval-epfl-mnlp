@@ -57,6 +57,7 @@ from lighteval.metrics.metrics_sample import (
     Recall,
     StringDistance,
     acc_golds_likelihood,
+    RewardModelingAcc,
 )
 from lighteval.metrics.normalizations import (
     LogProbCharNorm,
@@ -260,6 +261,14 @@ class Metrics(Enum):
         # Match boxed first before trying other regexes
         pred_extraction_target=(ExprExtractionConfig(), LatexExtractionConfig(boxed_match_priority=0)),
         aggregation_function=max,
+    )
+    reward_model_acc = SampleLevelMetric(
+        metric_name="reward_acc",
+        sample_level_fn=RewardModelingAcc().compute,
+        category=MetricCategory.REWARD_MODELING,
+        use_case=MetricUseCase.ACCURACY,
+        corpus_level_fn=np.mean,
+        higher_is_better=True,
     )
     loglikelihood_acc = SampleLevelMetric(
         metric_name="acc",
