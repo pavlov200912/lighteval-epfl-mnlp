@@ -22,6 +22,7 @@
 
 import ast
 import collections
+from copy import deepcopy
 import os
 import random
 import re
@@ -154,6 +155,13 @@ class Pipeline:
         self.evaluation_tracker = evaluation_tracker
         self._metric_options = metric_options or {}
         self.accelerator, self.parallel_context = self._init_parallelism_manager()
+
+        self.reward_modeling = False
+        if "reward" in tasks:
+            self.reward_modeling = True
+            self.ref_model_config = deepcopy(model_config)
+            self.ref_model_config.pretrained = "meta-llama/Llama-3.2-1B"
+            self.ref_model = self._init_model(model_config, model)
         self.model = self._init_model(model_config, model)
 
         generation_parameters = asdict(model_config.generation_parameters) if model_config else {}
@@ -459,6 +467,34 @@ class Pipeline:
             )
 
         return model_response_type
+
+    def _run_dpo_model(self):
+        logger.info("--- RUNNING DPO MODEL ---")
+        sample_id_to_responses: dict[(SampleUid, MetricCategory), list[ModelResponse]] = collections.defaultdict(list)
+
+        for request_type, requests in self.requests.items():
+            logger.info(f"Running {request_type} requests")
+
+            run_model = self.ref_model.get_method_from_request_type(request_type=request_type)
+            responses = run_model(requests, override_bs=self.pipeline_parameters.override_batch_size)
+
+            for request, response in zip(requests, responses):
+                request.reference_chosen_logps = response.policy_chosen_logps
+                request.reference_rejected_logps = response.policy_rejected_logps
+
+            run_model = self.model.get_method_from_request_type(request_type=request_type)
+            responses = run_model(requests, override_bs=self.pipeline_parameters.override_batch_size)
+
+            # Storing the responses associated to the same samples together
+            for response, request in zip(responses, requests):
+                for metric_category in request.metric_categories:
+                    sample_id = SampleUid(request.task_name, request.sample_index)
+                    sample_id_to_responses[(sample_id, metric_category)].append(response)
+
+        # Cleaning up the model before running metrics
+        self.model.cleanup()
+
+        return sample_id_to_responses
 
     def _run_model(self):
         # Running all requests depending on the model call type (log likelihood, generative, ...)
