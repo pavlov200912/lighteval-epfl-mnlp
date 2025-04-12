@@ -36,6 +36,7 @@ class RequestType(Enum):
     LOGLIKELIHOOD_ROLLING = auto()
     GREEDY_UNTIL = auto()
     GREEDY_UNTIL_MULTI_TURN = auto()
+    DPO_INFERENCE = auto()
 
 
 @dataclass
@@ -60,6 +61,35 @@ class Request:
     context: str
     metric_categories: list["MetricCategory"]  # noqa F821
 
+
+@dataclass
+class DPOInferenceRequest(Request):
+    """
+    Represents a request for DPO inference.
+
+    Attributes:
+        choices (list[str]): The list of token choices.
+        request_type (RequestType): The type of the request (DPO_INFERENCE).
+    """
+    request_type = RequestType.DPO_INFERENCE
+    tokenized_context: list[int] = None
+
+    chosen_continuation: str = None
+    rejected_continuation: str = None
+
+    reference_chosen_logps: list[float] = None
+    reference_rejected_lops: list[float] = None
+
+    chosen_input_ids: list[int] = None
+    chosen_attention_mask: list[int] = None
+    chosen_labels: list[int] = None
+
+    rejected_input_ids: list[int] = None
+    rejected_attention_mask: list[int] = None
+    rejected_labels: list[int] = None
+
+    prompt_input_ids: list[int] = None
+    prompt_attention_mask: list[int] = None
 
 @dataclass
 class LoglikelihoodRequest(Request):
@@ -175,6 +205,10 @@ class Doc:
     original_query: Optional[str] = ""  # the query before preprocessing, if stored
     specific: dict = None  # Information which is specific to the current eval
     task_name: str = ""
+
+    # For DPO
+    text_chosen: Optional[str] = None
+    text_rejected: Optional[str] = None
 
     # For few-shot
     instruction: Optional[str] = ""

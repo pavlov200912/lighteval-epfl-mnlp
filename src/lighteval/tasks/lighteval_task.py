@@ -50,11 +50,13 @@ from lighteval.tasks.requests import (
     LoglikelihoodRequest,
     LoglikelihoodRollingRequest,
     LoglikelihoodSingleTokenRequest,
+    DPOInferenceRequest,
     Request,
     RequestType,
     SampleUid,
 )
 from lighteval.utils.utils import ListLike, as_list, download_dataset_worker
+from lighteval.tasks.requests import DPOInferenceRequest
 
 
 if TYPE_CHECKING:
@@ -353,6 +355,19 @@ class LightevalTask:
             dict[RequestType, List[Request]]: List of requests.
         """
         requests: dict[RequestType, list[Request]] = collections.defaultdict(list)
+
+        if self.has_metric_category[MetricCategory.REWARD_MODELING]:
+            requests[RequestType.DPO_INFERENCE] += [
+                DPOInferenceRequest(
+                    task_name=current_task_name,
+                    sample_index=document_id_seed,
+                    request_index=0,
+                    context=context,
+                    chosen_continuation=formatted_doc.text_chosen,
+                    rejected_continuation=formatted_doc.text_rejected,
+                    metric_categories=[MetricCategory.TARGET_PERPLEXITY],
+                )
+            ]
 
         if self.has_metric_category[MetricCategory.TARGET_PERPLEXITY]:
             golds = formatted_doc.get_golds()
