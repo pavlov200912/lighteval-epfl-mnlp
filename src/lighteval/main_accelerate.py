@@ -119,6 +119,7 @@ def accelerate(  # noqa C901
     from lighteval.models.model_input import GenerationParameters
     from lighteval.models.transformers.adapter_model import AdapterModelConfig
     from lighteval.models.transformers.delta_model import DeltaModelConfig
+    from lighteval.models.transformers.embed_model import EmbeddingModelConfig
     from lighteval.models.transformers.transformers_model import BitsAndBytesConfig, TransformersModelConfig
     from lighteval.pipeline import EnvConfig, ParallelismManager, Pipeline, PipelineParameters, EvaluationMode
 
@@ -205,6 +206,15 @@ def accelerate(  # noqa C901
             raise ValueError("You can't specify a base model if you are not using delta/adapter weights")
         else:
             model_config = TransformersModelConfig(**args_dict)
+
+        if eval_mode == "rag":
+            assert "rag_params" in config, "ERROR: rag_params must be specified in the config file!"
+            rag_model_config = EmbeddingModelConfig(**args_dict)
+            rag_model_config.pretrained = config["rag_params"]["embedding_model"]
+            rag_model_config.docs_name_or_path = config["rag_params"]["docs_name_or_path"]
+            rag_model_config.top_k = config["rag_params"]["top_k"]
+            rag_model_config.similarity_fn = config["rag_params"]["similarity_fn"]
+
     else:
         model_args_dict: dict = {k.split("=")[0]: k.split("=")[1] if "=" in k else True for k in model_args.split(",")}
         model_args_dict["accelerator"] = accelerator
@@ -217,14 +227,12 @@ def accelerate(  # noqa C901
         pipeline_parameters=pipeline_params,
         evaluation_tracker=evaluation_tracker,
         model_config=model_config,
+        rag_model_config=rag_model_config if eval_mode == "rag" else None,
     )
 
     pipeline.evaluate()
-
     pipeline.show_results()
-
     results = pipeline.get_results()
-
     pipeline.save_and_push_results()
 
     return results
