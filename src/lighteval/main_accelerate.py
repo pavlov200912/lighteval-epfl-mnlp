@@ -47,6 +47,13 @@ def accelerate(  # noqa C901
         ),
     ],
     tasks: Annotated[str, Argument(help="Comma-separated list of tasks to evaluate on.")],
+    eval_mode: Annotated[
+        str,
+        Option(
+            help="Evaluation mode. Can be 'lighteval' (default), 'dpo', or 'rag'.",
+            rich_help_panel=HELP_PANEL_NAME_1,
+        ),
+    ] = "lighteval",
     # === Common parameters ===
     use_chat_template: Annotated[
         bool, Option(help="Use chat template for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
@@ -87,7 +94,7 @@ def accelerate(  # noqa C901
     ] = None,
     save_details: Annotated[
         bool, Option(help="Save detailed, sample per sample, results.", rich_help_panel=HELP_PANEL_NAME_2)
-    ] = False,
+    ] = True,
     # === debug ===
     max_samples: Annotated[
         Optional[int], Option(help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
@@ -113,7 +120,7 @@ def accelerate(  # noqa C901
     from lighteval.models.transformers.adapter_model import AdapterModelConfig
     from lighteval.models.transformers.delta_model import DeltaModelConfig
     from lighteval.models.transformers.transformers_model import BitsAndBytesConfig, TransformersModelConfig
-    from lighteval.pipeline import EnvConfig, ParallelismManager, Pipeline, PipelineParameters
+    from lighteval.pipeline import EnvConfig, ParallelismManager, Pipeline, PipelineParameters, EvaluationMode
 
     accelerator = Accelerator(kwargs_handlers=[InitProcessGroupKwargs(timeout=timedelta(seconds=3000))])
     cache_dir = CACHE_DIR
@@ -128,8 +135,19 @@ def accelerate(  # noqa C901
         public=public_run,
         hub_results_org=results_org,
     )
+
+    if eval_mode == "lighteval":
+        eval_mode_type = EvaluationMode.LIGHTEVAL
+    elif eval_mode == "dpo":
+        eval_mode_type = EvaluationMode.DPOEVAL
+    elif eval_mode == "rag":
+        eval_mode_type = EvaluationMode.RAGEVAL
+    else:
+        raise ValueError(f"Unknown eval mode: {eval_mode}. Must be one of 'lighteval', 'dpo', or 'rag'.")
+
     pipeline_params = PipelineParameters(
         launcher_type=ParallelismManager.ACCELERATE,
+        evaluation_mode=eval_mode_type,
         env_config=env_config,
         job_id=job_id,
         dataset_loading_processes=dataset_loading_processes,
