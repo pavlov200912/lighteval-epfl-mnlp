@@ -39,6 +39,7 @@ from lighteval.metrics import (
     apply_multichoice_metric_one_token,
     apply_perplexity_metric,
     apply_target_perplexity_metric,
+    apply_reward_modeling_metric
 )
 from lighteval.metrics.metrics import Metric, MetricCategory, Metrics
 from lighteval.models.transformers.transformers_model import TransformersModel
@@ -365,7 +366,7 @@ class LightevalTask:
                     context=context,
                     chosen_continuation=formatted_doc.text_chosen,
                     rejected_continuation=formatted_doc.text_rejected,
-                    metric_categories=[MetricCategory.TARGET_PERPLEXITY],
+                    metric_categories=[MetricCategory.REWARD_MODELING],
                 )
             ]
 
@@ -520,6 +521,8 @@ class LightevalTask:
 
     @staticmethod
     def _get_metric_method_from_category(metric_category):
+        if metric_category == MetricCategory.REWARD_MODELING:
+            return apply_reward_modeling_metric
         if metric_category == MetricCategory.TARGET_PERPLEXITY:
             return apply_target_perplexity_metric
         if metric_category in [MetricCategory.MULTICHOICE, MetricCategory.MULTICHOICE_PMI]:
