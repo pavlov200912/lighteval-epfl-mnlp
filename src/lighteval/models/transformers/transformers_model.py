@@ -20,12 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import logging
 import os
+import logging
 import numpy as np
 import warnings
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -54,7 +54,7 @@ from lighteval.models.abstract_model import LightevalModel, ModelInfo
 from lighteval.models.model_input import GenerationParameters
 from lighteval.models.model_output import (
     Batch,
-    DPOBatch,
+    RewardModelingResponse,
     GenerativeMultiturnResponse,
     GenerativeResponse,
     LoglikelihoodResponse,
@@ -208,7 +208,7 @@ class TransformersModelConfig:
             revision=revision,
             trust_remote_code=self.trust_remote_code,
             cache_dir=env_config.cache_dir,
-            token=env_config.token,
+            token=env_config.token
         )
 
         # Gathering the model's automatic quantization config, if available
@@ -313,7 +313,7 @@ class TransformersModel(LightevalModel):
         self.label_pad_token_id = -100
         self.padding_value = self._tokenizer.pad_token_id # 128004
         self.truncation_mode = "keep_end"
-        self.max_prompt_length = 256
+        self.max_prompt_length = 128
 
         self.pairwise_tokenization = config.pairwise_tokenization
 
@@ -1440,6 +1440,74 @@ class TransformersModel(LightevalModel):
             attention_mask=answer_attention_mask,
         )
 
+    def _prepare_dialogue_from_tokenizer(
+        self,
+        example: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        if self._tokenizer.chat_template is None:
+            return example
+        # multi turn
+        if isinstance(example["prompt"], list) and len(example["prompt"]) > 0:
+            # iterate through prompt messages, alternate user and assistant, end with example["chosen"]/rejected
+            messages = []
+            for i, (line) in enumerate(example["prompt"]):
+                p = line["content"]
+                _ = line["role"]
+                if (i + 1) % 2 == 1:
+                    messages.append({"role": "user", "content": p})
+                else:
+                    messages.append({"role": "assistant", "content": p})
+            # assert that the last message before this is user
+            assert messages[-1]["role"] == "user"
+
+            # required for DPO code only, otherwise discarded
+            temp_prompt = self._tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+            )
+
+            # end with chosen/rejected
+            messages.append({"role": "assistant", "content": example["chosen"]})
+            example["text_chosen"] = self._tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+            )
+
+            messages[-1] = {"role": "assistant", "content": example["rejected"]}
+            example["text_rejected"] = self._tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+            )
+            example["prompt"] = temp_prompt
+        # single turn
+        else:
+            # needed for DPO
+            messages = [
+                {"role": "user", "content": example["prompt"]},
+            ]
+            temp_prompt = self._tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+            )
+
+            messages = [
+                {"role": "user", "content": example["prompt"]},
+                {"role": "assistant", "content": example["chosen"]},
+            ]
+            example["text_chosen"] = self._tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+            )
+            messages = [
+                {"role": "user", "content": example["prompt"]},
+                {"role": "assistant", "content": example["rejected"]},
+            ]
+            example["text_rejected"] = self._tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+            )
+            example["prompt"] = temp_prompt
+        return example
 
     def tokenize_row(self, request) -> Dict:
         """Tokenize a single row from a DPO specific dataset.
@@ -1453,6 +1521,17 @@ class TransformersModel(LightevalModel):
             label_pad_token_id  for the prompt tokens.
         """
         batch = {}
+
+        # example = self._prepare_dialogue_from_tokenizer({
+        #     "prompt": request.context,
+        #     "chosen": request.chosen_continuation,
+        #     "rejected": request.rejected_continuation,
+        # })
+
+        # prompt = example["prompt"]
+        # chosen = example["chosen"]
+        # rejected = example["rejected"]
+
         prompt = request.context
         chosen = request.chosen_continuation
         rejected = request.rejected_continuation
@@ -1632,7 +1711,7 @@ class TransformersModel(LightevalModel):
             return (per_token_logps * loss_mask).sum(-1)
 
     def concatenated_forward(
-        self, batch: Dict[str, Union[List, torch.LongTensor]]
+        self, batch: Dict[str, Union[List, torch.LongTensor]], ref_free: bool = False
     ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
         """Run the given model on the given batch of inputs, concatenating the chosen and rejected inputs together.
 
@@ -1652,8 +1731,9 @@ class TransformersModel(LightevalModel):
 
         # set in init
         # if self.ref_free_norm == "norm":
-        #     average_log_prob = False
-        #     norm_log_prob = True
+        if ref_free:
+            average_log_prob = False
+            norm_log_prob = True
         # elif self.ref_free_norm == "avg":
         #     average_log_prob = True
         #     norm_log_prob = False
@@ -1682,7 +1762,7 @@ class TransformersModel(LightevalModel):
 
         return (chosen_logps, rejected_logps, chosen_logits, rejected_logits)
 
-    def dpo_inference(self, requests: list[LoglikelihoodRequest], override_bs: Optional[int] = None) -> list[LoglikelihoodResponse]:
+    def dpo_inference(self, requests: list[LoglikelihoodRequest], override_bs: Optional[int] = None) -> list[RewardModelingResponse]:
         for request in requests:
             batch = self.tokenize_row(request)
             request.chosen_input_ids = batch["chosen_input_ids"]
@@ -1700,15 +1780,18 @@ class TransformersModel(LightevalModel):
         res = []
 
         for split_start, split_end in tqdm(dataset.splits_start_end_iterator()):
+            logger.info(f"Evaluating split {split_start} to {split_end}")
             context_enc_chosen = dataset[0].chosen_input_ids
             context_enc_rejected = dataset[0].chosen_attention_mask
-            max_context = max(context_enc_chosen, context_enc_rejected)
+
+            max_context = len(context_enc_chosen) + len(context_enc_rejected)
 
             batch_size = self._get_batch_size(
                 override_bs=starting_batch_size,
                 max_input_length=max_context,
             )
 
+            batch_size = 4
             starting_batch_size = batch_size * 2
             dataloader = DataLoader(
                 dataset,
@@ -1722,17 +1805,18 @@ class TransformersModel(LightevalModel):
                 dataloader = self.accelerator.prepare(dataloader)
 
             for batch in tqdm(dataloader, disable=self.disable_tqdm, position=1):
+                # Get the reference model log probabilities
+                ref_chosen_logps = batch.get("reference_chosen_logps", None)
+                ref_rejected_logps = batch.get("reference_rejected_logps", None)
+
                 # Get the log probabilities
                 (
                     policy_chosen_logps,
                     policy_rejected_logps,
                     _,  # policy_chosen_logits,
                     _,  # policy_rejected_logits,
-                ) = self.concatenated_forward(batch)
-
-                # Get the reference model log probabilities
-                ref_chosen_logps = batch.reference_logprobs_chosen
-                ref_rejected_logps = batch.reference_logprobs_reject
+                ) = self.concatenated_forward(
+                    batch, ref_free=ref_chosen_logps is None)
 
                 if ref_chosen_logps is None:
                     ref_chosen_logps = torch.zeros_like(policy_chosen_logps)
@@ -1740,8 +1824,8 @@ class TransformersModel(LightevalModel):
                     ref_rejected_logps = torch.zeros_like(policy_rejected_logps)
 
                 # Compute the log ratios as rewards
-                rewards_chosen = policy_chosen_logps.detach().cpu() - ref_chosen_logps.detach().cpu()
-                rewards_rejected = policy_rejected_logps.detach().cpu() - ref_rejected_logps.detach().cpu()
+                rewards_chosen = policy_chosen_logps.detach() - ref_chosen_logps.detach()
+                rewards_rejected = policy_rejected_logps.detach() - ref_rejected_logps.detach()
 
                 # convert to float for bfloat16 case
                 scores_chosen_batch = rewards_chosen.float().cpu().numpy().tolist()
@@ -1751,22 +1835,20 @@ class TransformersModel(LightevalModel):
                 for ix, (chosen_score, rejected_score) in enumerate(zip(
                     scores_chosen_batch, scores_rejected_batch)):
                     res.append(
-                        LoglikelihoodResponse(
+                        RewardModelingResponse(
                             result=(chosen_score, rejected_score),
                             policy_chosen_logps=policy_chosen_logps[ix].cpu().numpy().tolist(),
-                            policy_rejected_logps=policy_rejected_logps[ix].cpu().numpy().tolist(),
+                            policy_rejected_logps=policy_rejected_logps[ix].cpu().numpy().tolist()
                         )
                     )
 
                 # Clean up GPUs
-                del out
-                del batch_probs
-                del batched_inputs
-                del batch_truncated
-                del batch_padded
+                del policy_chosen_logps
+                del policy_rejected_logps
+                del rewards_chosen
+                del rewards_rejected
 
         return dataset.get_original_order(res)
-
 
 class BaseModel(TransformersModel):
     def __post_init__(self):
@@ -1776,7 +1858,6 @@ class BaseModel(TransformersModel):
             "Careful, the BaseModel name is deprecated and will be removed, you should use TransformersModel instead!",
             FutureWarning,
         )
-
 
 class MultiTokenEOSCriteria(transformers.StoppingCriteria):
     """Criteria to stop on the specified multi-token sequence."""
