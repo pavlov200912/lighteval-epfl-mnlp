@@ -213,6 +213,7 @@ class EvaluationTracker:
         self.save_results(date_id, results_dict)
 
         if self.should_save_details:
+            print(details_datasets)
             self.save_details(date_id, details_datasets)
 
         if self.should_push_to_hub:

@@ -216,6 +216,8 @@ class DetailsLogger:
         gold_index: list = field(default_factory=list)
         metrics: dict = field(default_factory=dict)
         specifics: dict = field(default_factory=dict)
+        chosen_rewards: list = field(default_factory=list)
+        rejected_rewards: list = field(default_factory=list)
 
     @dataclass
     class CompiledDetail:
@@ -358,6 +360,10 @@ class DetailsLogger:
         detail.num_asked_few_shots = doc.num_asked_few_shots
 
         pred_saved = False
+        if task.has_metric_category[MetricCategory.REWARD_MODELING]:
+            detail.chosen_rewards = [o.result[0] for o in outputs]
+            detail.rejected_rewards = [o.result[1] for o in outputs]
+            pred_saved = True
         if (
             task.has_metric_category[MetricCategory.PERPLEXITY]
             or task.has_metric_category[MetricCategory.TARGET_PERPLEXITY]
