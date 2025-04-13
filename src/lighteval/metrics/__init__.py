@@ -27,6 +27,39 @@ from lighteval.tasks.requests import Doc
 from lighteval.utils.utils import as_list
 
 
+def apply_reward_modeling_metric(
+    sample_ids: list[str], responses: list[list[ModelResponse]], formatted_docs: list[Doc], metrics: list[Metric]
+):
+    outputs = []
+    chosen_reward_scores = []
+    rejected_reward_scores = []
+    for sample_id, results, formatted_doc in zip(sample_ids, responses, formatted_docs):
+        if len(results) > 1:
+            raise Exception("You returned more than one result for a sample with a reward modeling metric.")
+        results = results[0]
+        chosen_reward_scores.append(results.result[0])
+        rejected_reward_scores.append(results.result[1])
+
+    if len(metrics) > 1:
+        raise Exception("Currently, the only supported reward modeling metric is the pairwised reward modeling accuracy.")
+    metric = metrics[0]
+    if metric.category != MetricCategory.REWARD_MODELING:
+        raise Exception("You should only use the reward modeling metric with the reward modeling metric category.")
+
+    metric_outputs = metric.compute(
+        chosen_rewards=chosen_reward_scores,
+        rejected_rewards=rejected_reward_scores
+    )["reward_acc"]
+
+    outputs = []
+    for i in range(len(sample_ids)):
+        output = {
+            "reward_acc": metric_outputs[i],
+        }
+        outputs.append(output)
+    return outputs
+
+
 def apply_target_perplexity_metric(
     sample_ids: list[str], responses: list[list[ModelResponse]], formatted_docs: list[Doc], metrics: list[Metric]
 ):

@@ -71,22 +71,22 @@ class RewardModelingAcc:
         """
         self.aggregation_function = aggregation_function
 
-    def compute(self, chosen_rewards: list[float], reject_rewards: list[float], **kwargs) -> float:
+    def compute(self, chosen_rewards: list[float], rejected_rewards: list[float], **kwargs) -> list[float]:
         """Computes the metric over a list of golds and predictions for one single sample.
 
         Args:
             chosen_rewards (list[float]): Rewards computed for the chosen continuations
-            reject_rewards (list[float]): Rewards computed for the rejected continuations
+            rejected_rewards (list[float]): Rewards computed for the rejected continuations
 
         Returns:
             float: Aggregated score over the current sample's items.
         """
         results = []
-        for chosen_reward, reject_reward in zip(chosen_rewards, reject_rewards):
+        for chosen_reward, reject_reward in zip(chosen_rewards, rejected_rewards):
             results.append(self.compute_one_item(
                 chosen_reward=chosen_reward,
                 reject_reward=reject_reward))
-        return self.aggregation_function(results)
+        return results
 
     def compute_one_item(
         self,
