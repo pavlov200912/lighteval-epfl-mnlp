@@ -22,12 +22,13 @@
 
 import ast
 import collections
-from copy import deepcopy
 import os
 import random
 import re
 import shutil
+
 from contextlib import nullcontext
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import timedelta
 from enum import Enum, auto
@@ -91,10 +92,15 @@ class ParallelismManager(Enum):
     NONE = auto()
     SGLANG = auto()
 
+class EvaluationMode(Enum):
+    LIGHTEVAL = auto()
+    DPOEVAL = auto()
+    RAGEVAL = auto()
 
 @dataclass
 class PipelineParameters:
     launcher_type: ParallelismManager
+    evaluation_mode: EvaluationMode = EvaluationMode.LIGHTEVAL
     # Env parameters
     env_config: EnvConfig = field(default_factory=EnvConfig)
     job_id: int = 0
@@ -146,6 +152,7 @@ class Pipeline:
 
         self.pipeline_parameters = pipeline_parameters
         self.launcher_type = self.pipeline_parameters.launcher_type
+        self.evaluation_mode = self.pipeline_parameters.evaluation_mode
         if self.pipeline_parameters.max_samples:
             logger.warning(
                 "--max_samples WAS SET. THESE NUMBERS ARE ONLY PARTIAL AND SHOULD NOT BE USED FOR COMPARISON UNLESS YOU KNOW WHAT YOU ARE DOING."
@@ -157,11 +164,19 @@ class Pipeline:
         self.accelerator, self.parallel_context = self._init_parallelism_manager()
 
         self.reward_modeling = False
-        if "reward" in tasks:
+        if self.evaluation_mode == EvaluationMode.DPOEVAL:
+            logger.info("Initializing DPO Reference Model")
             self.reward_modeling = True
             self.ref_model_config = deepcopy(model_config)
             self.ref_model_config.pretrained = "meta-llama/Llama-3.2-1B"
-            self.ref_model = self._init_model(model_config, model)
+            self.ref_model = self._init_model(self.ref_model_config, model)
+
+        if self.evaluation_mode == EvaluationMode.RAGEVAL:
+            logger.info("Initializing RAG Model")
+            self.rag_model_config = deepcopy(model_config)
+            self.rag_model_config.pretrained = "meta-llama/Llama-3.2-1B"
+            self.rag_model = self._init_model(self.rag_model_config, model)
+
         self.model = self._init_model(model_config, model)
 
         generation_parameters = asdict(model_config.generation_parameters) if model_config else {}
@@ -297,9 +312,15 @@ class Pipeline:
                 logger.warning(
                     f"No responses found for {self.pipeline_parameters.load_responses_from_details_date_id} in details directory: {e}. Running model instead."
                 )
-                sample_id_to_responses = self._run_model()
+                if self.pipeline_parameters.evaluation_mode == EvaluationMode.DPOEVAL:
+                    sample_id_to_responses = self._run_dpo_model()
+                else:
+                    sample_id_to_responses = self._run_model()
         else:
-            sample_id_to_responses = self._run_model()
+            if self.pipeline_parameters.evaluation_mode == EvaluationMode.DPOEVAL:
+                sample_id_to_responses = self._run_dpo_model()
+            else:
+                sample_id_to_responses = self._run_model()
 
         self._compute_metrics(sample_id_to_responses)
 
@@ -472,16 +493,45 @@ class Pipeline:
         logger.info("--- RUNNING DPO MODEL ---")
         sample_id_to_responses: dict[(SampleUid, MetricCategory), list[ModelResponse]] = collections.defaultdict(list)
 
-        for request_type, requests in self.requests.items():
-            logger.info(f"Running {request_type} requests")
+        self.ref_model._tokenizer.chat_template = self.model._tokenizer.chat_template
 
-            run_model = self.ref_model.get_method_from_request_type(request_type=request_type)
-            responses = run_model(requests, override_bs=self.pipeline_parameters.override_batch_size)
+        for request_type, requests in self.requests.items():
+            logger.info(f"Running {request_type} requests | Collecting Reference Logprobs")
+
+            for request in requests:
+                request.reference_chosen_logps = 0.0
+                request.reference_rejected_logps = 0.0
+            run_ref_model = self.ref_model.get_method_from_request_type(request_type=request_type)
+            responses = run_ref_model(requests, override_bs=self.pipeline_parameters.override_batch_size)
 
             for request, response in zip(requests, responses):
                 request.reference_chosen_logps = response.policy_chosen_logps
                 request.reference_rejected_logps = response.policy_rejected_logps
 
+            logger.info(f"Running {request_type} requests | Collecting Policy Rewards")
+            run_model = self.model.get_method_from_request_type(request_type=request_type)
+            responses = run_model(requests, override_bs=self.pipeline_parameters.override_batch_size)
+
+            # Storing the responses associated to the same samples together
+            for response, request in zip(responses, requests):
+                for metric_category in request.metric_categories:
+                    sample_id = SampleUid(request.task_name, request.sample_index)
+                    sample_id_to_responses[(sample_id, metric_category)].append(response)
+
+        # Cleaning up the model before running metrics
+        self.ref_model.cleanup()
+        self.model.cleanup()
+
+        return sample_id_to_responses
+
+    def _run_rag_model(self):
+        # Running all requests depending on the model call type (log likelihood, generative, ...)
+        # to be able to batch them
+        logger.info("--- RUNNING RAG MODEL ---")
+        sample_id_to_responses: dict[(SampleUid, MetricCategory), list[ModelResponse]] = collections.defaultdict(list)
+
+        for request_type, requests in self.requests.items():
+            logger.info(f"Running {request_type} requests")
             run_model = self.model.get_method_from_request_type(request_type=request_type)
             responses = run_model(requests, override_bs=self.pipeline_parameters.override_batch_size)
 
