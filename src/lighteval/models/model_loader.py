@@ -39,6 +39,7 @@ from lighteval.models.litellm_model import LiteLLMClient, LiteLLMModelConfig
 from lighteval.models.sglang.sglang_model import SGLangModel, SGLangModelConfig
 from lighteval.models.transformers.adapter_model import AdapterModel, AdapterModelConfig
 from lighteval.models.transformers.delta_model import DeltaModel, DeltaModelConfig
+from lighteval.models.transformers.embed_model import EmbeddingModelConfig, EmbeddingModel
 from lighteval.models.transformers.transformers_model import TransformersModel, TransformersModelConfig
 from lighteval.models.vllm.vllm_model import VLLMModel, VLLMModelConfig
 from lighteval.utils.imports import (
@@ -63,6 +64,7 @@ def load_model(  # noqa: C901
         TransformersModelConfig,
         AdapterModelConfig,
         DeltaModelConfig,
+        EmbeddingModelConfig,
         TGIModelConfig,
         InferenceEndpointModelConfig,
         DummyModelConfig,
@@ -73,7 +75,7 @@ def load_model(  # noqa: C901
         InferenceProvidersModelConfig,
     ],
     env_config: EnvConfig,
-) -> Union[TransformersModel, AdapterModel, DeltaModel, ModelClient, DummyModel]:
+) -> Union[TransformersModel, AdapterModel, DeltaModel, EmbeddingModel, ModelClient, DummyModel]:
     """Will load either a model from an inference server or a model from a checkpoint, depending
     on the config type.
 
@@ -155,12 +157,14 @@ def load_model_with_inference_endpoints(
 
 
 def load_model_with_accelerate_or_default(
-    config: Union[AdapterModelConfig, TransformersModelConfig, DeltaModelConfig], env_config: EnvConfig
+    config: Union[AdapterModelConfig, TransformersModelConfig, DeltaModelConfig, EmbeddingModelConfig], env_config: EnvConfig
 ):
     if isinstance(config, AdapterModelConfig):
         model = AdapterModel(config=config, env_config=env_config)
     elif isinstance(config, DeltaModelConfig):
         model = DeltaModel(config=config, env_config=env_config)
+    elif isinstance(config, EmbeddingModelConfig):
+        model = EmbeddingModel(config=config, env_config=env_config)
     elif isinstance(config, VLLMModelConfig):
         if not is_vllm_available():
             raise ImportError(NO_VLLM_ERROR_MSG)
