@@ -6,10 +6,10 @@
 
 
 <p align="center">
-    <i>Your go-to toolkit for lightning-fast, flexible LLM evaluation, from Hugging Face's Leaderboard and Evals Team.</i>
+    <i>A go-to toolkit for flexible LLM evaluation, adapted from and inspired by Lighteval, RewardBench, & Langchain.</i>
 </p>
 
-<div align="center">
+<!-- <div align="center">
 
 [![Tests](https://github.com/huggingface/lighteval/actions/workflows/tests.yaml/badge.svg?branch=main)](https://github.com/huggingface/lighteval/actions/workflows/tests.yaml?query=branch%3Amain)
 [![Quality](https://github.com/huggingface/lighteval/actions/workflows/quality.yaml/badge.svg?branch=main)](https://github.com/huggingface/lighteval/actions/workflows/quality.yaml?query=branch%3Amain)
@@ -19,43 +19,40 @@
 
 </div>
 
+--- -->
+
+<!-- **Documentation**: <a href="https://huggingface.co/docs/lighteval/index" target="_blank">Lighteval's Wiki</a> -->
+
 ---
 
-**Documentation**: <a href="https://huggingface.co/docs/lighteval/index" target="_blank">Lighteval's Wiki</a>
+### LightEval - EPFL Modern Natural Language Processing 🚀
 
----
+This evaluation suite is adapted from Huggingface's all-in-one toolkit for evaluating LLMs **Lighteval** across multiple backends and benchmark types. Dive deep into your model’s performance by saving and exploring detailed, sample-by-sample results to debug and see how your models stack-up.
 
-### Unlock the Power of LLM Evaluation with Lighteval 🚀
-
-**Lighteval** is your all-in-one toolkit for evaluating LLMs across multiple
-backends—whether it's
-[transformers](https://github.com/huggingface/transformers),
-[tgi](https://github.com/huggingface/text-generation-inference),
-[vllm](https://github.com/vllm-project/vllm), or
-[nanotron](https://github.com/huggingface/nanotron)—with
-ease. Dive deep into your model’s performance by saving and exploring detailed,
-sample-by-sample results to debug and see how your models stack-up.
-
-Customization at your fingertips: letting you either browse all our existing [tasks](https://huggingface.co/docs/lighteval/available-tasks) and [metrics](https://huggingface.co/docs/lighteval/metric-list) or effortlessly create your own [custom task](https://huggingface.co/docs/lighteval/adding-a-custom-task) and [custom metric](https://huggingface.co/docs/lighteval/adding-a-new-metric), tailored to your needs.
-
-Seamlessly experiment, benchmark, and store your results on the Hugging Face
-Hub, S3, or locally.
+<!-- Customization at your fingertips: letting you either browse all our existing [tasks](https://huggingface.co/docs/lighteval/available-tasks) and [metrics](https://huggingface.co/docs/lighteval/metric-list) or effortlessly create your own [custom task](https://huggingface.co/docs/lighteval/adding-a-custom-task) tailored to your needs. -->
 
 
-## 🔑 Key Features
+<!-- ## 🔑 Key Features
 
 - **Speed**: [Use vllm as backend for fast evals](https://huggingface.co/docs/lighteval/use-vllm-as-backend).
 - **Completeness**: [Use the accelerate backend to launch any models hosted on Hugging Face](https://huggingface.co/docs/lighteval/quicktour#accelerate).
 - **Seamless Storage**: [Save results in S3 or Hugging Face Datasets](https://huggingface.co/docs/lighteval/saving-and-reading-results).
 - **Python API**: [Simple integration with the Python API](https://huggingface.co/docs/lighteval/using-the-python-api).
 - **Custom Tasks**: [Easily add custom tasks](https://huggingface.co/docs/lighteval/adding-a-custom-task).
-- **Versatility**: Tons of [metrics](https://huggingface.co/docs/lighteval/metric-list) and [tasks](https://huggingface.co/docs/lighteval/available-tasks) ready to go.
+- **Versatility**: Tons of [metrics](https://huggingface.co/docs/lighteval/metric-list) and [tasks](https://huggingface.co/docs/lighteval/available-tasks) ready to go. -->
 
 
 ## ⚡️ Installation
 
+Frist, clone this repo to your home directory:
+
 ```bash
-pip install lighteval
+git clone https://github.com/eric11eca/lighteval-epfl-mnlp.git
+```
+
+Next, install from source
+```bash
+pip install -e .
 ```
 
 Lighteval allows for many extras when installing, see [here](https://huggingface.co/docs/lighteval/installation) for a complete list.
@@ -67,66 +64,76 @@ an environment variable:
 huggingface-cli login
 ```
 
-## 🚀 Quickstart
+## 📋 Model Configs
 
-Lighteval offers the following entry points for model evaluation:
+To make model loading and configuration simple, setup a model config for each of the four models you need to implement for M2 and M3. All model config files are already setup for you in the directory `model_configs`: `dpo_model.yaml`, `mcqa_model.yaml`, `quantized_model.yaml`, `rag_model.yaml`. Please modify these files to reflect your own model setup for each evaluation.
 
-- `lighteval accelerate` : evaluate models on CPU or one or more GPUs using [🤗
-  Accelerate](https://github.com/huggingface/accelerate)
-- `lighteval nanotron`: evaluate models in distributed settings using [⚡️
-  Nanotron](https://github.com/huggingface/nanotron)
-- `lighteval vllm`: evaluate models on one or more GPUs using [🚀
-  VLLM](https://github.com/vllm-project/vllm)
-- `lighteval endpoint`
-    - `inference-endpoint`: evaluate models on one or more GPUs using [🔗
-  Inference Endpoint](https://huggingface.co/inference-endpoints/dedicated)
-    - `tgi`: evaluate models on one or more GPUs using [🔗 Text Generation Inference](https://huggingface.co/docs/text-generation-inference/en/index)
-    - `openai`: evaluate models on one or more GPUs using [🔗 OpenAI API](https://platform.openai.com/)
+Inside of the `rag_model.yaml` file, in addition to specify the huggingface repo-id for your own LLM, you also have to specify the huggingface repo-id for your document dataset (`docs_name_or_path`) and embedding model (`embedding_model`). For other arguments for RAG, please read the `rag_params` section in the config file for more details.
 
-Here’s a quick command to evaluate using the Accelerate backend:
+## 📝 Custom Tasks
+
+To create a custom task that augment the Lighteval tasks, first, create a python file under the `community_tasks` directory. We have put two example task files there already: `mnlp_dpo_evals.py` and `mnlp_mcqa_evals.py`. You can directly use these two task files for validation evaluation. If you want to evaluate on your own dataset, please follow carefully the two example files.
+
+If you want to create your own evaluation data, make sure that the dataset follows exactly the format defined by the prompt functions (`preference_pair` & `mmlu_harness`). If you want to have your own dataset format, please make sure that you define a new prompt function that will convert a line from your dataset to a document to be used for evaluation. You can then replace the input to the `prompt_function` argument with your new defined function.
+
+IMPORTANT NOTE: The metrics for MCQA and DPO evaluations have been set. Please do not modify the metrics! MCQA will always use `[Metrics.loglikelihood_acc, Metrics.loglikelihood_acc_norm_nospace]` and DPO will alwasy use `[Metrics.reward_model_acc]`.
+
+
+## 🚀 Launching Evaluation
+
+To launch the evaluation, first setup the environment variables for accessing and caching with Huggingface:
 
 ```shell
+# Often default to /home/<user>/.cache/huggingface/hub/
+export HF_HOME=<path-to-your-hf-home-cache-dir>
+# You can find this token in your user profile on huggingface hub
+export HF_TOKEN=<your-hf-hub-token>
+```
+
+Please use the following four commands to launch the evaluation of your four models with the Accelerate backend:
+
+```shell
+# Evaluating MCQA Model
 lighteval accelerate \
-    "pretrained=gpt2" \
-    "leaderboard|truthfulqa:mc|0|0"
+    --eval-mode "lighteval" \
+    --save-details \
+    --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
+    --cache-dir "<path-to-your-hf-home-cache-dir>" \
+    --output_dir "<path-to-your-output-dir>" \
+    model_configs/mcqa_model.yaml \
+    "community|mnlp_mcqa_evals|0|0"
+
+# Evaluating Quantized Model
+lighteval accelerate \
+    --eval-mode "lighteval" \
+    --save-details \
+    --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
+    --cache-dir "<path-to-your-hf-home-cache-dir>" \
+    --output_dir "<path-to-your-output-dir>" \
+    model_configs/quantized_model.yaml \
+    "community|mnlp_mcqa_evals|0|0"
+
+# Evaluating DPO Model
+lighteval accelerate \
+    --eval-mode "dpo" \
+    --save-details \
+    --custom-tasks "community_tasks/mnlp_dpo_evals.py" \
+    --cache-dir "<path-to-your-hf-home-cache-dir>" \
+    --output_dir "<path-to-your-output-dir>" \
+    model_configs/dpo_model.yaml \
+    "community|mnlp_dpo_evals|0|0"
+
+# Evaluating RAG Model
+lighteval accelerate \
+    --eval-mode "rag" \
+    --save-details \
+    --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
+    --cache-dir "<path-to-your-hf-home-cache-dir>" \
+    --output_dir "<path-to-your-output-dir>" \
+    model_configs/rag_model.yaml \
+    "community|mnlp_mcqa_evals|0|0"
 ```
 
-## 🙏 Acknowledgements
+## 📸 Logging
 
-Lighteval started as an extension of the fantastic [Eleuther AI
-Harness](https://github.com/EleutherAI/lm-evaluation-harness) (which powers the
-[Open LLM
-Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard))
-and draws inspiration from the amazing
-[HELM](https://crfm.stanford.edu/helm/latest/) framework.
-
-While evolving Lighteval into its own standalone tool, we are grateful to the
-Harness and HELM teams for their pioneering work on LLM evaluations.
-
-## 🌟 Contributions Welcome 💙💚💛💜🧡
-
-Got ideas? Found a bug? Want to add a
-[task](https://huggingface.co/docs/lighteval/adding-a-custom-task) or
-[metric](https://huggingface.co/docs/lighteval/adding-a-new-metric)?
-Contributions are warmly welcomed!
-
-If you're adding a new feature, please open an issue first.
-
-If you open a PR, don't forget to run the styling!
-
-```bash
-pip install -e .[dev]
-pre-commit install
-pre-commit run --all-files
-```
-## 📜 Citation
-
-```bibtex
-@misc{lighteval,
-  author = {Fourrier, Clémentine and Habib, Nathan and Kydlíček, Hynek and Wolf, Thomas and Tunstall, Lewis},
-  title = {LightEval: A lightweight framework for LLM evaluation},
-  year = {2023},
-  version = {0.8.0},
-  url = {https://github.com/huggingface/lighteval}
-}
-```
+The evaluation will log the results automatically at the `output_dir` directory you specified, under the `results` directory. The results are saved in a sub-path `<HF_username>/<model_name>`. For example with the model `meta-llama/Llama-3.2-1B-Instruct`, the results will be saved under `output_dir/results/meta-llama/Llama-3.2-1B-Instruct/`. Because we also set `save-details` details to be true. The sample-wise predictions will also be saved under the `details` director with the same sub-path format. For example, `output_dir/details/meta-llama/Llama-3.2-1B-Instruct/`.
