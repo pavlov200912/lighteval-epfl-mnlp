@@ -77,8 +77,8 @@ class DPOInferenceRequest(Request):
     chosen_continuation: str = None
     rejected_continuation: str = None
 
-    reference_chosen_logps: float = None
-    reference_rejected_lops: float = None
+    reference_chosen_logps: float = 0.0
+    reference_rejected_logps: float = 0.0
 
     chosen_input_ids: list[int] = None
     chosen_attention_mask: list[int] = None

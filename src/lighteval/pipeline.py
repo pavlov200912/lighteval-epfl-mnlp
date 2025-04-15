@@ -501,10 +501,6 @@ class Pipeline:
 
         for request_type, requests in self.requests.items():
             logger.info(f"Running {request_type} requests | Collecting Reference Logprobs")
-
-            for request in requests:
-                request.reference_chosen_logps = 0.0
-                request.reference_rejected_logps = 0.0
             run_ref_model = self.ref_model.get_method_from_request_type(request_type=request_type)
             responses = run_ref_model(requests, override_bs=self.pipeline_parameters.override_batch_size)
 
