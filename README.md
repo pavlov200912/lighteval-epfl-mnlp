@@ -50,15 +50,14 @@ Frist, clone this repo to your home directory:
 git clone https://github.com/eric11eca/lighteval-epfl-mnlp.git
 ```
 
-Next, install from source
+Next, install from source with the `quantization` extras:
 ```bash
-pip install -e .
+pip install -e .[quantization]
 ```
 
-Lighteval allows for many extras when installing, see [here](https://huggingface.co/docs/lighteval/installation) for a complete list.
+<!-- Lighteval allows for many extras when installing, see [here](https://huggingface.co/docs/lighteval/installation) for a complete list. -->
 
-If you want to push results to the Hugging Face Hub, add your access token as
-an environment variable:
+If you want to push results to the Hugging Face Hub or access gated models & private datasets, add your access token as an environment variable:
 
 ```shell
 huggingface-cli login
