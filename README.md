@@ -27,7 +27,7 @@
 
 ### LightEval - EPFL Modern Natural Language Processing 🚀
 
-This evaluation suite is adapted from Huggingface's all-in-one toolkit for evaluating LLMs **Lighteval** across multiple backends and benchmark types. Dive deep into your model’s performance by saving and exploring detailed, sample-by-sample results to debug and see how your models stack-up.
+This evaluation suite is adapted from Huggingface's all-in-one toolkit for evaluating LLMs **Lighteval**, across multiple backends and benchmark types. Dive deep into your model’s performance by saving and exploring detailed, sample-by-sample results to debug and see how your models stack-up.
 
 <!-- Customization at your fingertips: letting you either browse all our existing [tasks](https://huggingface.co/docs/lighteval/available-tasks) and [metrics](https://huggingface.co/docs/lighteval/metric-list) or effortlessly create your own [custom task](https://huggingface.co/docs/lighteval/adding-a-custom-task) tailored to your needs. -->
 
@@ -44,7 +44,7 @@ This evaluation suite is adapted from Huggingface's all-in-one toolkit for evalu
 
 ## ⚡️ Installation
 
-Frist, clone this repo to your home directory:
+First, clone this repo to your home directory:
 
 ```bash
 git clone https://github.com/eric11eca/lighteval-epfl-mnlp.git
@@ -52,6 +52,7 @@ git clone https://github.com/eric11eca/lighteval-epfl-mnlp.git
 
 Next, install from source with the `quantization` extras:
 ```bash
+cd lighteval-epfl-mnlp
 pip install -e .[quantization]
 ```
 
@@ -65,27 +66,27 @@ huggingface-cli login
 
 ## 📋 Model Configs
 
-To make model loading and configuration simple, setup a model config for each of the four models you need to implement for M2 and M3. All model config files are already setup for you in the directory `model_configs`: `dpo_model.yaml`, `mcqa_model.yaml`, `quantized_model.yaml`, `rag_model.yaml`. Please modify these files to reflect your own model setup for each evaluation.
+To make model loading and configuration simple, set up a model config for each of the four models you need to implement for M2 and M3. All model config files are already set up for you in the directory `model_configs`: `dpo_model.yaml`, `mcqa_model.yaml`, `quantized_model.yaml`, `rag_model.yaml`. Please modify these files to reflect your model setup for each evaluation.
 
-Inside of the `rag_model.yaml` file, in addition to specify the huggingface repo-id for your own LLM, you also have to specify the huggingface repo-id for your document dataset (`docs_name_or_path`) and embedding model (`embedding_model`). For other arguments for RAG, please read the `rag_params` section in the config file for more details.
+Inside the `rag_model.yaml` file, in addition to specifying the huggingface repo-id for your LLM, you also have to specify the huggingface repo-id for your document dataset (`docs_name_or_path`) and embedding model (`embedding_model`). For other arguments for RAG, please read the `rag_params` section in the config file for more details.
 
 ## 📝 Custom Tasks
 
-To create a custom task that augment the Lighteval tasks, first, create a python file under the `community_tasks` directory. We have put two example task files there already: `mnlp_dpo_evals.py` and `mnlp_mcqa_evals.py`. You can directly use these two task files for validation evaluation. If you want to evaluate on your own dataset, please follow carefully the two example files.
+To create a custom task that augments the Lighteval tasks, first, create a Python file under the `community_tasks` directory. We have put two example task files there already: `mnlp_dpo_evals.py` and `mnlp_mcqa_evals.py`. You can directly use these two task files for validation evaluation. If you want to evaluate on your dataset, please follow the two example files carefully.
 
-If you want to create your own evaluation data, make sure that the dataset follows exactly the format defined by the prompt functions (`preference_pair` & `mmlu_harness`). If you want to have your own dataset format, please make sure that you define a new prompt function that will convert a line from your dataset to a document to be used for evaluation. You can then replace the input to the `prompt_function` argument with your new defined function.
+If you want to create your evaluation data, make sure that the dataset follows exactly the format defined by the prompt functions (`preference_pair` & `mmlu_harness`). If you want to have your dataset format, please make sure that you define a new prompt function that will convert a line from your dataset to a document to be used for evaluation. You can then replace the input to the `prompt_function` argument with your newly defined function.
 
-IMPORTANT NOTE: The metrics for MCQA and DPO evaluations have been set. Please do not modify the metrics! MCQA will always use `[Metrics.loglikelihood_acc, Metrics.loglikelihood_acc_norm_nospace]` and DPO will alwasy use `[Metrics.reward_model_acc]`.
+IMPORTANT NOTE: The metrics for MCQA and DPO evaluations have been set. Please do not modify the metrics! MCQA will always use `[Metrics.loglikelihood_acc, Metrics.loglikelihood_acc_norm_nospace]` and DPO will always use `[Metrics.reward_model_acc]`.
 
 
 ## 🚀 Launching Evaluation
 
-To launch the evaluation, first setup the environment variables for accessing and caching with Huggingface:
+To launch the evaluation, first set up the environment variables for accessing and caching with Huggingface:
 
 ```shell
 # Often default to /home/<user>/.cache/huggingface/hub/
 export HF_HOME=<path-to-your-hf-home-cache-dir>
-# You can find this token in your user profile on huggingface hub
+# You can find this token in your user profile on HuggingFace Hub
 export HF_TOKEN=<your-hf-hub-token>
 ```
 
@@ -97,7 +98,6 @@ lighteval accelerate \
     --eval-mode "lighteval" \
     --save-details \
     --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
-    --cache-dir "<path-to-your-hf-home-cache-dir>" \
     --output_dir "<path-to-your-output-dir>" \
     model_configs/mcqa_model.yaml \
     "community|mnlp_mcqa_evals|0|0"
@@ -107,7 +107,6 @@ lighteval accelerate \
     --eval-mode "lighteval" \
     --save-details \
     --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
-    --cache-dir "<path-to-your-hf-home-cache-dir>" \
     --output_dir "<path-to-your-output-dir>" \
     model_configs/quantized_model.yaml \
     "community|mnlp_mcqa_evals|0|0"
@@ -117,7 +116,6 @@ lighteval accelerate \
     --eval-mode "dpo" \
     --save-details \
     --custom-tasks "community_tasks/mnlp_dpo_evals.py" \
-    --cache-dir "<path-to-your-hf-home-cache-dir>" \
     --output_dir "<path-to-your-output-dir>" \
     model_configs/dpo_model.yaml \
     "community|mnlp_dpo_evals|0|0"
@@ -127,7 +125,6 @@ lighteval accelerate \
     --eval-mode "rag" \
     --save-details \
     --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
-    --cache-dir "<path-to-your-hf-home-cache-dir>" \
     --output_dir "<path-to-your-output-dir>" \
     model_configs/rag_model.yaml \
     "community|mnlp_mcqa_evals|0|0"
@@ -135,4 +132,4 @@ lighteval accelerate \
 
 ## 📸 Logging
 
-The evaluation will log the results automatically at the `output_dir` directory you specified, under the `results` directory. The results are saved in a sub-path `<HF_username>/<model_name>`. For example with the model `meta-llama/Llama-3.2-1B-Instruct`, the results will be saved under `output_dir/results/meta-llama/Llama-3.2-1B-Instruct/`. Because we also set `save-details` details to be true. The sample-wise predictions will also be saved under the `details` director with the same sub-path format. For example, `output_dir/details/meta-llama/Llama-3.2-1B-Instruct/`.
+The evaluation will log the results automatically at the `output_dir` directory you specified, under the `results` directory. The results are saved in a sub-path `<HF_username>/<model_name>`. For example, with the model `meta-llama/Llama-3.2-1B-Instruct`, the results will be saved under `output_dir/results/meta-llama/Llama-3.2-1B-Instruct/`. Because we also set `save-details` details to be true. The sample-wise predictions will also be saved under the `details` directory with the same sub-path format. For example, `output_dir/details/meta-llama/Llama-3.2-1B-Instruct/`.
