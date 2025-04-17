@@ -1,6 +1,6 @@
 <p align="center">
   <br/>
-    <img alt="lighteval EPFL MNLP library logo" src="./assets/mnlp_lighteval_logo.png" style="max-width: 80%;">
+    <img alt="lighteval EPFL MNLP library logo" src="./assets/mnlp_lighteval_logo.png" style="max-width: 50%; max-height: 50%;">
   <br/>
 </p>
 
