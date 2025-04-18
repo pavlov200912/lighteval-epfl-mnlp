@@ -98,7 +98,7 @@ lighteval accelerate \
     --eval-mode "lighteval" \
     --save-details \
     --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
-    --output_dir "<path-to-your-output-dir>" \
+    --output-dir "<path-to-your-output-dir>" \
     model_configs/mcqa_model.yaml \
     "community|mnlp_mcqa_evals|0|0"
 
@@ -107,7 +107,7 @@ lighteval accelerate \
     --eval-mode "lighteval" \
     --save-details \
     --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
-    --output_dir "<path-to-your-output-dir>" \
+    --output-dir "<path-to-your-output-dir>" \
     model_configs/quantized_model.yaml \
     "community|mnlp_mcqa_evals|0|0"
 
@@ -116,7 +116,7 @@ lighteval accelerate \
     --eval-mode "dpo" \
     --save-details \
     --custom-tasks "community_tasks/mnlp_dpo_evals.py" \
-    --output_dir "<path-to-your-output-dir>" \
+    --output-dir "<path-to-your-output-dir>" \
     model_configs/dpo_model.yaml \
     "community|mnlp_dpo_evals|0|0"
 
@@ -125,7 +125,7 @@ lighteval accelerate \
     --eval-mode "rag" \
     --save-details \
     --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
-    --output_dir "<path-to-your-output-dir>" \
+    --output-dir "<path-to-your-output-dir>" \
     model_configs/rag_model.yaml \
     "community|mnlp_mcqa_evals|0|0"
 ```
