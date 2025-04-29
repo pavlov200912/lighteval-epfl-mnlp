@@ -187,6 +187,7 @@ class LightevalTask:
         self.dataset_revision = cfg.hf_revision
         self.dataset_filter = cfg.hf_filter
         self.trust_dataset = cfg.trust_dataset
+        self.limited_num_samples = cfg.limited_num_samples
         self.dataset: Optional[DatasetDict] = None  # Delayed download
         logger.info(f"{self.dataset_path} {self.dataset_config_name}")
         self._fewshot_docs = None

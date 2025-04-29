@@ -240,9 +240,11 @@ def download_dataset_worker(
         dataset = dataset.filter(dataset_filter)
 
     if limit_dataset_number > 0:
-        dataset = dataset.shuffle(seed=42)
-        dataset = dataset.select(
-            range(min(limit_dataset_number, len(dataset))))
+        for split in dataset:
+            dataset[split] = dataset[split].shuffle(seed=42)
+            dataset[split] = dataset[split].select(
+                range(min(limit_dataset_number,
+                          len(dataset[split]))))
 
     # It returns DatasetDict because we don't specify a split
     return dataset  # type: ignore
