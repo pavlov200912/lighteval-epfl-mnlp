@@ -219,6 +219,7 @@ def download_dataset_worker(
     dataset_config_name: str,
     trust_dataset: bool,
     dataset_filter: Callable[[dict], bool] | None = None,
+    limit_dataset_number: int | None = None,
     revision: str | None = None,
 ) -> DatasetDict:
     """
@@ -237,6 +238,11 @@ def download_dataset_worker(
 
     if dataset_filter is not None:
         dataset = dataset.filter(dataset_filter)
+
+    if limit_dataset_number > 0:
+        dataset = dataset.shuffle(seed=42)
+        dataset = dataset.select(
+            range(min(limit_dataset_number, len(dataset))))
 
     # It returns DatasetDict because we don't specify a split
     return dataset  # type: ignore

@@ -103,6 +103,7 @@ class LightevalTaskConfig:
     hf_avail_splits: Optional[ListLike[str]] = field(default_factory=lambda: ["train", "validation", "test"])
     # We default to false, to reduce security issues
     trust_dataset: bool = False
+    limited_num_samples: int = -1
 
     # Splits
     evaluation_splits: ListLike[str] = field(default_factory=lambda: ["validation"])
@@ -567,6 +568,7 @@ class LightevalTask:
                     task.dataset_config_name,
                     task.trust_dataset,
                     task.dataset_filter,
+                    task.limited_num_samples,
                     task.dataset_revision,
                 )
                 for task in tasks
@@ -581,6 +583,7 @@ class LightevalTask:
                             task.dataset_config_name,
                             task.trust_dataset,
                             task.dataset_filter,
+                            task.limited_num_samples,
                             task.dataset_revision,
                         )
                         for task in tasks

@@ -30,7 +30,8 @@ task = LightevalTaskConfig(
     metric=[Metrics.loglikelihood_acc, Metrics.loglikelihood_acc_norm_nospace],
     generation_size=-1,
     stop_sequence=None,
-    trust_dataset=True
+    trust_dataset=True,
+    limited_num_samples=10,
 )
 
 # STORE YOUR EVALS

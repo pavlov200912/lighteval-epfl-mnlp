@@ -352,6 +352,9 @@ class EmbeddingModel(TransformersModel):
         Build a knowledge base from the given documents.
         """
         ds = load_dataset(self.docs_name_or_path, split="train")
+        ds = ds.shuffle(seed=42)
+        ds = ds.select(range(min(100, len(ds))))
+
         knowledge_base = [
             LangchainDocument(
                 page_content=doc["text"],
