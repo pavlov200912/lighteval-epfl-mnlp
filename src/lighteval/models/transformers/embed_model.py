@@ -174,12 +174,9 @@ class EmbeddingModel(TransformersModel):
     def _create_auto_model(
         self, config: TransformersModelConfig, env_config: EnvConfig
     ) -> HuggingFaceEmbeddings:
-        """
-        Creates an instance of the pretrained HF embedding model.
-        (Using the simpler setup from Code 2)
-        """
+
         torch_dtype = _get_dtype(config.dtype, self._config)
-        # Simplified model_kwargs and device handling from Code 2
+        
         model_kwargs = {
             "device": "cuda" if torch.cuda.is_available() else "cpu", # Dynamically check cuda
             "model_kwargs": {"torch_dtype": torch_dtype}, # Correct nesting
@@ -187,9 +184,7 @@ class EmbeddingModel(TransformersModel):
         encode_kwargs = {
             "normalize_embeddings": config.similarity_fn == "cosine"
         }
-        # Removed multi_process=True as it wasn't in Code 2 and might interact
-        # complexly with accelerate if that were still fully enabled elsewhere.
-        # Removed unused commented arguments.
+        
         embedding_model = HuggingFaceEmbeddings(
             model_name=config.pretrained,
             model_kwargs=model_kwargs,
@@ -342,10 +337,7 @@ class EmbeddingModel(TransformersModel):
         return docs_processed_unique
 
     def _build_knowledge_base(self) -> FAISS:
-        """
-        Build a knowledge base using explicit embedding and native FAISS IVF-PQ.
-        (Using the logic from Code 2)
-        """
+       
         ds = (
             load_dataset(self.docs_name_or_path, split="train")
             .shuffle(seed=42)
@@ -358,7 +350,6 @@ class EmbeddingModel(TransformersModel):
                 metadata={"source": doc["source"]}) for doc in tqdm(ds, desc="Loading KB")
         ]
 
-        # Use the same splitting as Code 2 (though it was similar anyway)
         docs_processed = self._split_documents(
              self._max_length, knowledge_base) # Pass knowledge_base directly
 
@@ -440,9 +431,8 @@ class EmbeddingModel(TransformersModel):
         index.add(np.asarray(embeddings, dtype="float32"))
         index.nprobe = min(8, nlist) if index_key.startswith("IVF") else 1 # recall/speed knob for IVF
 
-        # 3. Wrap in LangChain FAISS without triggering duplicate-index bug
+        # Wrap in LangChain FAISS without triggering duplicate-index bug
         ids = list(map(str, range(len(texts))))
-        # Use the same docstore class as Code 2
         docstore = InMemoryDocstore(dict(zip(ids, docs_processed)))
         index_to_docstore_id = {i: ids[i] for i in range(len(ids))}
 
