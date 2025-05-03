@@ -169,7 +169,7 @@ class Pipeline:
             logger.info("Initializing DPO Reference Model")
             self.reward_modeling = True
             self.ref_model_config = deepcopy(model_config)
-            self.ref_model_config.pretrained = "meta-llama/Llama-3.2-1B"
+            self.ref_model_config.pretrained = "Qwen/Qwen3-0.6B-Base"
             self.ref_model = self._init_model(self.ref_model_config, model)
 
         if self.evaluation_mode == EvaluationMode.RAGEVAL:
