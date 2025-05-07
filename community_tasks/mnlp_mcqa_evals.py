@@ -24,7 +24,7 @@ task = LightevalTaskConfig(
     prompt_function=mmlu_harness,
     suite=["community"],
     hf_subset="",
-    hf_repo="zechen-nlp/MNLP_STEM_mcqa_evals",
+    hf_repo="zechen-nlp/MNLP_STEM_mcqa_demo",
     hf_avail_splits=["test"],
     evaluation_splits=["test"],
     metric=[Metrics.loglikelihood_acc, Metrics.loglikelihood_acc_norm_nospace],
@@ -32,6 +32,7 @@ task = LightevalTaskConfig(
     stop_sequence=None,
     trust_dataset=True,
     limited_num_samples=10,
+    # Set to 0 to use all samples, specify a number to limit the number of samples for debugging purpose
 )
 
 # STORE YOUR EVALS
