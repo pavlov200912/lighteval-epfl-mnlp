@@ -186,10 +186,8 @@ def accelerate(  # noqa C901
         args_dict["accelerator"] = accelerator
         args_dict["quantization_config"] = quantization_config
         args_dict["batch_size"] = override_batch_size
-        # args_dict["multichoice_continuations_start_space"] = config["base_params"][
-        #     "multichoice_continuations_start_space"
-        # ]
-        args_dict["multichoice_continuations_start_space"] = None
+        args_dict["ref_free_norm"] = config["base_params"]["ref_free_norm"]
+        args_dict["multichoice_continuations_start_space"] = True
         args_dict["use_chat_template"] = use_chat_template
 
         # Keeping only non null params

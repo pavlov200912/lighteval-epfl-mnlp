@@ -3,6 +3,7 @@ model:
     model_args: "pretrained=Qwen/Qwen3-0.6B,revision=main,trust_remote_code=true" # Change this to your own model name on huggingface hub
     dtype: "float16"
     compile: false
+    ref_free_norm: "none" # Set to "none" if you use reference model in your training, otherwise, specify the normalization type for your reference-free DPO inference: avg, sum, or norm
 
   # Ignore this section, do not modify!
   merged_weights:
