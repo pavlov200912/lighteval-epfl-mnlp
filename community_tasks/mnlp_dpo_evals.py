@@ -25,7 +25,7 @@ task = LightevalTaskConfig(
     generation_size=-1,
     stop_sequence=None,
     trust_dataset=True,
-    limited_num_samples=10 # Set to 0 to use all samples, specify a number to limit the number of samples for debugging purpose
+    limited_num_samples=10 # Set to 0 to use all samples, specify a number to limit the number of samples for debugging purposes
 )
 
 # STORE YOUR EVALS
