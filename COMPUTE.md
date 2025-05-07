@@ -1,22 +1,26 @@
 # CS 552 Modern NLP Project Compute Tutorial
 
-This year, we will be using EPFL's RCP educational cluster section as the main compute for students. 
+This year, we will be using EPFL's RCP educational cluster section as the main compute for students.
 You will be operating on the cluster via the [Gnoto](https://gnoto.epfl.ch/) JupyterLab environment.
 
 ## Step 1: Login to Gnoto:
 Proceed with the link and login with your **Tequila** credential.
 
-## Step 3: Create Virtual Environment
+## Step 2: Create Virtual Environment
 
+```bash
 my_venvs_create mnlp_m2
 my_venvs_activate mnlp_m2
+```
 
-## Step 4: Install Default Packages
+## Step 3: Install Default Packages
 
+```bash
 pip install torch
 pip install transformers
+```
 
-## A simple model loading file
+## Step 4: Load A Huggingface Model
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -47,11 +51,14 @@ print(response)
 
 ## Install evaluation suite
 
+```bash
+git clone https://github.com/eric11eca/lighteval-epfl-mnlp.git
 
-## Setup evaluation suite
+cd lighteval-epfl-mnlp
 
+pip install -e .[quantization]
+```
 
-## Create 
+## Setup Huggingface Hub Account
 
-
-
+Setup an account at the [Huggingface Hub](https://huggingface.co/)
