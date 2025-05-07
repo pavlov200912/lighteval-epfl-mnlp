@@ -526,6 +526,12 @@ class DPODataCollatorWithPadding:
                     dtype = torch.float32  # will be downcasted if necessary by the Trainer
                 else:
                     dtype = torch.int64
+
+                if k.endswith(("_input_ids", "_labels")):
+                    for ex in features:
+                        new_list = [0 if item is None else item for item in ex[k]]
+                        ex[k] = new_list
+
                 to_pad = [torch.tensor(ex[k], dtype=dtype) for ex in features]
                 padded_batch[k] = pad(to_pad, padding_value=padding_value, padding_side=padding_side)
             elif k.endswith("_logps") and features[0][k] is not None:
