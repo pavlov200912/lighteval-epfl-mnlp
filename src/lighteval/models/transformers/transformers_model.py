@@ -1744,6 +1744,8 @@ class TransformersModel(LightevalModel):
         elif self.ref_free_norm == "none":
             average_log_prob = False
             norm_log_prob = False
+        else:
+            raise ValueError(f"Unknown ref_free_norm: {self.ref_free_norm}! Must be one of [norm, avg, sum, none]")
 
         all_logps = self.get_batch_logps(
             all_logits,
