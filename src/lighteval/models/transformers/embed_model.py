@@ -341,7 +341,7 @@ class EmbeddingModel(TransformersModel):
         ds = (
             load_dataset(self.docs_name_or_path, split="train")
             .shuffle(seed=42)
-            .select(range(min(2000, len(load_dataset(self.docs_name_or_path, split="train")))))
+            .select(range(min(1000, len(load_dataset(self.docs_name_or_path, split="train")))))
         )
 
         knowledge_base = [
