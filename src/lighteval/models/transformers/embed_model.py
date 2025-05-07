@@ -6,6 +6,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import faiss
 import torch
 import transformers
 
@@ -21,7 +22,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores.utils import DistanceStrategy
 from langchain_community.vectorstores import FAISS
-import faiss
 from langchain_community.docstore import InMemoryDocstore
 
 from lighteval.utils.utils import EnvConfig
@@ -176,7 +176,7 @@ class EmbeddingModel(TransformersModel):
     ) -> HuggingFaceEmbeddings:
 
         torch_dtype = _get_dtype(config.dtype, self._config)
-        
+
         model_kwargs = {
             "device": "cuda" if torch.cuda.is_available() else "cpu", # Dynamically check cuda
             "model_kwargs": {"torch_dtype": torch_dtype}, # Correct nesting
@@ -184,7 +184,7 @@ class EmbeddingModel(TransformersModel):
         encode_kwargs = {
             "normalize_embeddings": config.similarity_fn == "cosine"
         }
-        
+
         embedding_model = HuggingFaceEmbeddings(
             model_name=config.pretrained,
             model_kwargs=model_kwargs,
@@ -337,11 +337,11 @@ class EmbeddingModel(TransformersModel):
         return docs_processed_unique
 
     def _build_knowledge_base(self) -> FAISS:
-       
+
         ds = (
             load_dataset(self.docs_name_or_path, split="train")
             .shuffle(seed=42)
-            .select(range(min(100, len(load_dataset(self.docs_name_or_path, split="train"))))) # Ensure range is valid
+            .select(range(min(2000, len(load_dataset(self.docs_name_or_path, split="train")))))
         )
 
         knowledge_base = [
@@ -351,23 +351,22 @@ class EmbeddingModel(TransformersModel):
         ]
 
         docs_processed = self._split_documents(
-             self._max_length, knowledge_base) # Pass knowledge_base directly
+             self._max_length, knowledge_base)
 
         texts = [d.page_content for d in docs_processed]
-        metadatas = [d.metadata for d in docs_processed] # Needed for docstore
+        metadatas = [d.metadata for d in docs_processed]
 
         logger.info(f"Embedding {len(texts)} documents...")
-        # 1. Embed once (using the potentially faster model from the modified _create_auto_model)
+
         embeddings = self.model.embed_documents(texts)
         if not embeddings:
              raise ValueError("Embedding process yielded no vectors!")
         dim = len(embeddings[0])
 
         logger.info(f"Building FAISS IVF-PQ index (dim={dim})...")
-        # 2. Build & train IVF-PQ index
-        # Get the total number of vectors
+
         N = len(texts)
-    
+
         if N == 0:
             raise ValueError("Cannot build an index with 0 vectors.")
         elif N < 8:
@@ -377,7 +376,6 @@ class EmbeddingModel(TransformersModel):
             nlist = min(4, N)
             logger.warning(f"Very small N ({N}). Using nlist={nlist}. Consider using IndexFlatL2 instead.")
         else:
-            # Recommened minimum value for nlist is 4*sqrt(N), we will use 4*closest power of 2 to sqrt(N)
             sqrt_n = math.sqrt(N)
             log2_sqrt_n = math.log2(sqrt_n)
 
@@ -390,16 +388,12 @@ class EmbeddingModel(TransformersModel):
                 closest_pow2 = pow2_high
 
             nlist = 4 * closest_pow2
-
-            # Ensure nlist is at least a minimum practical value (e.g., 4)
             nlist = max(4, nlist)
-            # Ensure nlist doesn't exceed the number of vectors
             nlist = min(nlist, N)
 
-        # Convert to integer for the index string
         nlist = int(nlist)
         logger.info(f"Using N={N}, calculated nlist = {nlist} (based on 2 * closest power of 2 to sqrt(N))")
-        # Ensure PQ subquantizers (e.g., 32) doesn't exceed dimension
+
         pq_m = min(32, dim)
         index_key = f"IVF{nlist},PQ{pq_m}"
         try:
@@ -409,14 +403,11 @@ class EmbeddingModel(TransformersModel):
              # Fallback to FlatL2 if IVF-PQ fails (e.g., dim < pq_m or too few vectors for nlist)
              logger.warning("Falling back to IndexFlatL2 due to index_factory error.")
              index = faiss.IndexFlatL2(dim)
-             index_key = "IndexFlatL2" # Update key for logging
+             index_key = "IndexFlatL2"
 
         # Check if training is required (IVF needs training, Flat does not)
         if hasattr(index, 'is_trained') and not index.is_trained:
             logger.info(f"Training FAISS index ({index_key})...")
-            # Ensure enough vectors for training
-            # FAISS typically requires at least `nlist` vectors for training IVF,
-            # and often recommends more (e.g., 30*nlist to 256*nlist).
             embeddings_np = np.asarray(embeddings, dtype="float32")
             if embeddings_np.shape[0] < nlist and index_key.startswith("IVF"):
                  logger.warning(f"Insufficient vectors ({embeddings_np.shape[0]}) to train {nlist} clusters. Reducing nlist.")
@@ -431,21 +422,18 @@ class EmbeddingModel(TransformersModel):
         index.add(np.asarray(embeddings, dtype="float32"))
         index.nprobe = min(8, nlist) if index_key.startswith("IVF") else 1 # recall/speed knob for IVF
 
-        # Wrap in LangChain FAISS without triggering duplicate-index bug
         ids = list(map(str, range(len(texts))))
         docstore = InMemoryDocstore(dict(zip(ids, docs_processed)))
         index_to_docstore_id = {i: ids[i] for i in range(len(ids))}
 
         logger.info(f"Knowledge-base built with {index_key} (nprobe = {getattr(index, 'nprobe', 'N/A')})")
 
-        # Use the low-level FAISS constructor
         vector_db = FAISS(
-            embedding_function=self.model.embed_query, # Pass the function, not the object
+            embedding_function=self.model.embed_query,
             index=index,
             docstore=docstore,
             index_to_docstore_id=index_to_docstore_id,
             distance_strategy=distance_strategy_mapping[self.similarity_fn],
-            # normalize_L2 should align with cosine distance if used
             normalize_L2=(self.similarity_fn == "cosine")
         )
         return vector_db
@@ -458,7 +446,6 @@ class EmbeddingModel(TransformersModel):
         """
         Retrieve documents from the knowledge base based on the query.
         """
-        # query_vector = self.model.embed_query(query)
         retrieved_docs = self.vector_db.similarity_search(query=query, k=self.top_k)
         retrieved_docs_text = [doc.page_content for doc in retrieved_docs]
 
