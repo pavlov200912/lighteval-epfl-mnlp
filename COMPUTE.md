@@ -13,6 +13,26 @@ my_venvs_create mnlp_m2
 my_venvs_activate mnlp_m2
 ```
 
+### Reconfigure the CC Environment Variable
+
+```bash
+#!/bin/bash
+# This script wraps the real gcc and adds the -B option.
+
+REAL_GCC="/bin/gcc" # The actual gcc path your Python script is trying to call
+GCC_LIBEXEC_DIR="/usr/libexec/gcc/x86_64-linux-gnu/13/"
+
+# Execute the real gcc with the added -B option and all original arguments
+exec "$REAL_GCC" -B "$GCC_LIBEXEC_DIR" "$@"
+```
+
+Let's put the above into `$HOME/gcc_wrapper`. We export this path to the CC env variable:
+
+```bash
+unset GCC_EXEC_PREFIX
+export CC="$HOME/gcc_wrapper"
+```
+
 ## Step 3: Install Default Packages
 
 ```bash
