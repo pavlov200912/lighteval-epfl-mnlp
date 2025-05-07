@@ -24,7 +24,8 @@ task = LightevalTaskConfig(
     metric=[Metrics.reward_model_acc],
     generation_size=-1,
     stop_sequence=None,
-    trust_dataset=True
+    trust_dataset=True,
+    limited_num_samples=10
 )
 
 # STORE YOUR EVALS
