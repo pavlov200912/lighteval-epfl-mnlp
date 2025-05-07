@@ -153,6 +153,7 @@ class TransformersModelConfig:
     subfolder: Optional[str] = None
     revision: str = "main"
     batch_size: int = -1
+    ref_free_norm: Optional[str] = "none"
     max_gen_toks: Optional[int] = 256
     max_length: Optional[int] = None
     add_special_tokens: bool = True
@@ -311,9 +312,10 @@ class TransformersModel(LightevalModel):
         )
 
         self.label_pad_token_id = -100
-        self.padding_value = self._tokenizer.pad_token_id # 128004
+        self.padding_value = self._tokenizer.pad_token_id
         self.truncation_mode = "keep_end"
         self.max_prompt_length = 128
+        self.ref_free_norm = config.ref_free_norm
 
         self.pairwise_tokenization = config.pairwise_tokenization
 
@@ -1729,22 +1731,19 @@ class TransformersModel(LightevalModel):
             attention_mask=concatenated_batch["concatenated_attention_mask"]
         ).logits
 
-        # set in init
-        # if self.ref_free_norm == "norm":
-        if ref_free:
+        if self.ref_free_norm == "norm":
             average_log_prob = False
             norm_log_prob = True
-        # elif self.ref_free_norm == "avg":
-        #     average_log_prob = True
-        #     norm_log_prob = False
-        # elif self.ref_free_norm == "sum":
-        #     average_log_prob = False
-        #     norm_log_prob = False
+        elif self.ref_free_norm == "avg":
+            average_log_prob = True
+            norm_log_prob = False
+        elif self.ref_free_norm == "sum":
+            average_log_prob = False
+            norm_log_prob = False
         # handles when reference model exists
-        # elif self.ref_free_norm == "none":
-
-        average_log_prob = False
-        norm_log_prob = False
+        elif self.ref_free_norm == "none":
+            average_log_prob = False
+            norm_log_prob = False
 
         all_logps = self.get_batch_logps(
             all_logits,
@@ -1818,18 +1817,23 @@ class TransformersModel(LightevalModel):
                 ) = self.concatenated_forward(
                     batch, ref_free=ref_chosen_logps is None)
 
-                if ref_chosen_logps is None:
-                    ref_chosen_logps = torch.zeros_like(policy_chosen_logps)
-                else:
-                    ref_chosen_logps = ref_chosen_logps.to(self.device)
-                if ref_rejected_logps is None:
-                    ref_rejected_logps = torch.zeros_like(policy_rejected_logps)
-                else:
-                    ref_rejected_logps = ref_rejected_logps.to(self.device)
+                if self.ref_free_norm == "none":
+                    if ref_chosen_logps is None:
+                        ref_chosen_logps = torch.zeros_like(policy_chosen_logps)
+                    else:
+                        ref_chosen_logps = ref_chosen_logps.to(self.device)
+                    if ref_rejected_logps is None:
+                        ref_rejected_logps = torch.zeros_like(policy_rejected_logps)
+                    else:
+                        ref_rejected_logps = ref_rejected_logps.to(self.device)
 
-                # Compute the log ratios as rewards
-                rewards_chosen = policy_chosen_logps.detach() - ref_chosen_logps.detach()
-                rewards_rejected = policy_rejected_logps.detach() - ref_rejected_logps.detach()
+                    # Compute the log ratios as rewards
+                    rewards_chosen = policy_chosen_logps.detach() - ref_chosen_logps.detach()
+                    rewards_rejected = policy_rejected_logps.detach() - ref_rejected_logps.detach()
+                else:
+                    # Compute the log ratios as rewards without reference model
+                    rewards_chosen = policy_chosen_logps.detach()
+                    rewards_rejected = policy_rejected_logps.detach()
 
                 # convert to float for bfloat16 case
                 scores_chosen_batch = rewards_chosen.float().cpu().numpy().tolist()

@@ -168,9 +168,14 @@ class Pipeline:
         if self.evaluation_mode == EvaluationMode.DPOEVAL:
             logger.info("Initializing DPO Reference Model")
             self.reward_modeling = True
+
             self.ref_model_config = deepcopy(model_config)
             self.ref_model_config.pretrained = "Qwen/Qwen3-0.6B-Base"
-            self.ref_model = self._init_model(self.ref_model_config, model)
+            if self.ref_model_config.ref_free_norm == "none":
+                self.ref_model = self._init_model(self.ref_model_config, model)
+            else:
+                logger.info("You are using DPO inference without a reference model. Make sure you set the correct ref_free_norm.")
+                self.ref_model = None
 
         if self.evaluation_mode == EvaluationMode.RAGEVAL:
             logger.info("Initializing RAG Model")
@@ -497,16 +502,18 @@ class Pipeline:
         logger.info("--- RUNNING DPO MODEL ---")
         sample_id_to_responses: dict[(SampleUid, MetricCategory), list[ModelResponse]] = collections.defaultdict(list)
 
-        self.ref_model._tokenizer.chat_template = self.model._tokenizer.chat_template
+        if self.ref_model is not None:
+            self.ref_model._tokenizer.chat_template = self.model._tokenizer.chat_template
 
         for request_type, requests in self.requests.items():
-            logger.info(f"Running {request_type} requests | Collecting Reference Logprobs")
-            run_ref_model = self.ref_model.get_method_from_request_type(request_type=request_type)
-            responses = run_ref_model(requests, override_bs=self.pipeline_parameters.override_batch_size)
+            if self.ref_model is not None:
+                logger.info(f"Running {request_type} requests | Collecting Reference Logprobs")
+                run_ref_model = self.ref_model.get_method_from_request_type(request_type=request_type)
+                responses = run_ref_model(requests, override_bs=self.pipeline_parameters.override_batch_size)
 
-            for request, response in zip(requests, responses):
-                request.reference_chosen_logps = response.policy_chosen_logps
-                request.reference_rejected_logps = response.policy_rejected_logps
+                for request, response in zip(requests, responses):
+                    request.reference_chosen_logps = response.policy_chosen_logps
+                    request.reference_rejected_logps = response.policy_rejected_logps
 
             logger.info(f"Running {request_type} requests | Collecting Policy Rewards")
             run_model = self.model.get_method_from_request_type(request_type=request_type)
