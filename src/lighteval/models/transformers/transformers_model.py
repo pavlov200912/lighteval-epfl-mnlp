@@ -1821,11 +1821,11 @@ class TransformersModel(LightevalModel):
                 if ref_chosen_logps is None:
                     ref_chosen_logps = torch.zeros_like(policy_chosen_logps)
                 else:
-                    ref_chosen_logps = torch.tensor(ref_chosen_logps).to(self.device)
+                    ref_chosen_logps = ref_chosen_logps.to(self.device)
                 if ref_rejected_logps is None:
                     ref_rejected_logps = torch.zeros_like(policy_rejected_logps)
                 else:
-                    ref_rejected_logps = torch.tensor(ref_rejected_logps).to(self.device)
+                    ref_rejected_logps = ref_rejected_logps.to(self.device)
 
                 # Compute the log ratios as rewards
                 rewards_chosen = policy_chosen_logps.detach() - ref_chosen_logps.detach()
