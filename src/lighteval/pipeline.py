@@ -526,7 +526,8 @@ class Pipeline:
                     sample_id_to_responses[(sample_id, metric_category)].append(response)
 
         # Cleaning up the model before running metrics
-        self.ref_model.cleanup()
+        if self.ref_model is not None:
+            self.ref_model.cleanup()
         self.model.cleanup()
 
         return sample_id_to_responses
