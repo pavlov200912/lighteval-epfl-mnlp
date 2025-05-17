@@ -9,13 +9,13 @@ def mmlu_harness(line, task_name: str = None):
     prompt += line["question"] + "\n"
     prompt += "".join([f"{key}. {choice}\n" for key, choice in zip(LETTER_INDICES, line["choices"])])
     prompt += "Answer:"
-    gold_ix = LETTER_INDICES.index(line["answer"])
+    gold_idx = LETTER_INDICES.index(line["answer"])
 
     return Doc(
         task_name=task_name,
         query=prompt,
         choices=[" A", " B", " C", " D"],
-        gold_index=gold_ix,
+        gold_index=gold_idx,
         instruction=f"The following are multiple choice questions (with answers) about {topic.replace('_', ' ')}.\n\n",
     )
 
