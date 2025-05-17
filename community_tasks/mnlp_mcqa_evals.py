@@ -4,7 +4,7 @@ from lighteval.tasks.default_prompts import LETTER_INDICES
 from lighteval.tasks.lighteval_task import LightevalTaskConfig
 
 def mmlu_harness(line, task_name: str = None):
-    topic = "knowledge and kills in advanced master-level STEM courses"
+    topic = "knowledge and skills in advanced master-level STEM courses"
     prompt = f"The following are multiple choice questions (with answers) about {topic.replace('_', ' ')}.\n\n"
     prompt += line["question"] + "\n"
     prompt += "".join([f"{key}. {choice}\n" for key, choice in zip(LETTER_INDICES, line["choices"])])
