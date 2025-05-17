@@ -450,7 +450,7 @@ class EmbeddingModel(TransformersModel):
         retrieved_docs_text = [doc.page_content for doc in retrieved_docs]
 
         context = "\nRelavent Documents:\n"
-        context += "".join([
+        context += "\n\n".join([
             f"Document {str(i)}:::\n" + doc
             for i, doc in enumerate(retrieved_docs_text)
         ])

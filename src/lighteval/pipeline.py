@@ -538,16 +538,11 @@ class Pipeline:
         logger.info("--- RUNNING RAG MODEL ---")
         sample_id_to_responses: dict[(SampleUid, MetricCategory), list[ModelResponse]] = collections.defaultdict(list)
 
-        context_to_docs_map = {}
-
         for request_type, requests in self.requests.items():
             for idx, request in enumerate(requests):
                 logger.info(f"Retrieving documents for {request_type} request {idx + 1} || {len(requests)}")
                 query = request.context
-                if query not in context_to_docs_map:
-                    context_to_docs_map[query] = self.rag_model.run_model(query=query)
-                else:
-                    continue
+                request.context = self.rag_model.run_model(query=query)
 
             logger.info(f"Running {request_type} requests")
             run_model = self.model.get_method_from_request_type(request_type=request_type)
