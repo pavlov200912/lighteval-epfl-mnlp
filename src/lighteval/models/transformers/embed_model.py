@@ -68,6 +68,7 @@ distance_strategy_mapping = {
 class EmbeddingModelConfig(TransformersModelConfig):
     """Configuration for the embedding model."""
 
+    num_chunks: int = 100000
     similarity_fn: str = "cosine"
     top_k: int = 5
     docs_name_or_path: str = "lighteval/knowledge_base"
@@ -114,6 +115,7 @@ class EmbeddingModel(TransformersModel):
 
         self.docs_name_or_path = config.docs_name_or_path
         self.top_k = config.top_k
+        self.num_chunks = config.num_chunks
         self.similarity_fn = config.similarity_fn
         self.vector_db = self._build_knowledge_base()
 
@@ -334,16 +336,18 @@ class EmbeddingModel(TransformersModel):
                 unique_texts[doc.page_content] = True
                 docs_processed_unique.append(doc)
 
+        # shuffle and then limit to num_chunks
+        if len(docs_processed_unique) > self.num_chunks:
+            logger.warning(f"Limiting to {self.num_chunks} chunks from {len(docs_processed_unique)} unique chunks.")
+            np.random.shuffle(docs_processed_unique)
+            docs_processed_unique = docs_processed_unique[:self.num_chunks]
+
+        logger.info(f"Processed and truncated (optionally) {len(knowledge_base)} documents, resulting in {len(docs_processed_unique)} unique chunks.")
+
         return docs_processed_unique
 
     def _build_knowledge_base(self) -> FAISS:
-
-        ds = (
-            load_dataset(self.docs_name_or_path, split="train")
-            .shuffle(seed=42)
-            .select(range(min(1000, len(load_dataset(self.docs_name_or_path, split="train")))))
-        )
-
+        ds = load_dataset(self.docs_name_or_path, split="train")
         knowledge_base = [
             LangchainDocument(
                 page_content=doc["text"],
@@ -440,8 +444,7 @@ class EmbeddingModel(TransformersModel):
 
     def run_model(
         self,
-        query: str,
-        k: int = 5
+        query: str
     ) -> List[LangchainDocument]:
         """
         Retrieve documents from the knowledge base based on the query.
