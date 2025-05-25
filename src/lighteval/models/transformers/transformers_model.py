@@ -222,7 +222,8 @@ class TransformersModelConfig:
         if model_auto_quantization_config is not None:
             if self.quantization_config is not None:
                 # We don't load models quantized by default with a different user provided conf
-                raise ValueError("You manually requested quantization on a model already quantized!")
+                logger.warning("You manually requested quantization on a model already quantized! Using the model's automatic quantization config instead.")
+                self.quantization_config = None
 
             # We add the quantization to the model params we store
             if model_auto_quantization_config["quant_method"] == "gptq":
@@ -434,7 +435,7 @@ class TransformersModel(LightevalModel):
             )
         else:
             max_mem_this_process = None
-            device_map = None
+            device_map = "auto" if self.accelerator else None
             logger.info(
                 f"Model parallel was set to False, max memory set to {max_mem_this_process} and device map to {device_map}"
             )
@@ -463,6 +464,10 @@ class TransformersModel(LightevalModel):
         config.model_parallel, max_memory, device_map = self.init_model_parallel(config.model_parallel)
         torch_dtype = _get_dtype(config.dtype, self._config)
 
+        logger.info(
+            f"max_memory {max_memory}, device_map {device_map}, torch_dtype {torch_dtype}"
+        )
+
         pretrained_config = AutoConfig.from_pretrained(
             config.pretrained,
             revision=(config.revision + (f"/{config.subfolder}" if config.subfolder else "")),
@@ -487,6 +492,27 @@ class TransformersModel(LightevalModel):
             token=env_config.token,
             **kwargs,
         )
+
+        def get_model_size(model):
+            param_size = 0
+            for param in model.parameters():
+                param_size += param.nelement() * param.element_size()
+
+            buffer_size = 0
+            for buffer in model.buffers():
+                buffer_size += buffer.nelement() * buffer.element_size()
+
+            size_mb = (param_size + buffer_size) / 1024 / 1024
+            return size_mb
+
+        model_size = get_model_size(model)
+
+        if config.quantization_config is not None and "quant_method" in config.quantization_config.to_dict():
+            logger.info(
+                f"Model loaded with quantization method {config.quantization_config.quant_method} has model size {model_size:.2f} MB"
+            )
+        else:
+            logger.info(f"Model loaded has model size {model_size:.2f} MB")
 
         return model
 
@@ -1088,6 +1114,8 @@ class TransformersModel(LightevalModel):
                     max_context=max_context_continuation_size_allowed,
                 )
 
+                # torch.cuda.reset_peak_memory_stats()
+
                 model_output = self._model_call(prepared_batch.input_ids)
                 logits = F.log_softmax(model_output, dim=-1)  # [batch, padding_length, vocab]
 
@@ -1156,6 +1184,8 @@ class TransformersModel(LightevalModel):
                         padded_tokens_count=padded.cpu().item(),
                     )
                     res.append(answer)
+
+                # print(f"Peak memory during inference: {torch.cuda.max_memory_allocated() / 1024**3:.2f} GB")
 
                 # Clean up GPUs
                 del model_output
@@ -1306,9 +1336,8 @@ class TransformersModel(LightevalModel):
             context_enc = dataset[0].tokenized_context
             max_context = len(context_enc[-self._max_length :])
             batch_size = self._get_batch_size(override_bs=override_bs, max_input_length=max_context)
-            starting_batch_size = batch_size * 2
 
-            dataloader = DataLoader(dataset, batch_size=starting_batch_size, collate_fn=lambda batch: batch)
+            dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=lambda batch: batch)
             if self.accelerator is not None:
                 dataloader = self.accelerator.prepare(dataloader)
 
@@ -1344,9 +1373,9 @@ class TransformersModel(LightevalModel):
                 batched_inputs, len_inputs = self.pad_and_gather(prepared_batch.input_ids)
                 # We sometimes have different tasks with a different number of choices.
                 # Padding to -10000 makes sure that we won't reach index problems later as all log probs will be smaller than that
-                batch_probs = pad_sequence(batch_probs, batch_first=True, padding_value=-10000000)
+                batch_probs = pad_sequence(batch_probs, batch_first=True, padding_value=-65504.0)
                 batch_probs, len_probs = self.pad_and_gather(batch_probs)
-                batch_cont_tokens = pad_sequence(batch_cont_tokens, batch_first=True, padding_value=-10000000)
+                batch_cont_tokens = pad_sequence(batch_cont_tokens, batch_first=True, padding_value=-65504.0)
                 batch_cont_tokens, len_cont = self.pad_and_gather(batch_cont_tokens)
 
                 # No reshape
@@ -1777,7 +1806,6 @@ class TransformersModel(LightevalModel):
             request.prompt_attention_mask = batch["prompt_attention_mask"]
 
         dataset = LoglikelihoodDataset(requests=requests, num_dataset_splits=self.DATASET_SPLITS)
-        starting_batch_size = STARTING_BATCH_SIZE
         res = []
 
         for split_start, split_end in tqdm(dataset.splits_start_end_iterator()):
@@ -1788,12 +1816,10 @@ class TransformersModel(LightevalModel):
             max_context = len(context_enc_chosen) + len(context_enc_rejected)
 
             batch_size = self._get_batch_size(
-                override_bs=starting_batch_size,
+                override_bs=override_bs,
                 max_input_length=max_context,
             )
 
-            batch_size = 4
-            starting_batch_size = batch_size * 2
             dataloader = DataLoader(
                 dataset,
                 batch_size=batch_size,
