@@ -102,7 +102,7 @@ class RewardModelingAcc:
         Returns:
             float: The success indicator of reward modeling. Will be 1 if the chosen reward is higher than the rejected one, 0 otherwise.
         """
-        if chosen_reward >= reject_reward:
+        if chosen_reward > reject_reward:
             return 1
         else:
             return 0
