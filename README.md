@@ -56,6 +56,11 @@ cd lighteval-epfl-mnlp
 pip install -e .[quantization]
 ```
 
+Update the transformers version to `4.51.3`:
+```bash
+pip install transformers==4.51.3
+```
+
 <!-- Lighteval allows for many extras when installing, see [here](https://huggingface.co/docs/lighteval/installation) for a complete list. -->
 
 If you want to push results to the Hugging Face Hub or access gated models & private datasets, add your access token as an environment variable:
@@ -97,6 +102,7 @@ Please use the following four commands to launch the evaluation of your four mod
 lighteval accelerate \
     --eval-mode "lighteval" \
     --save-details \
+    --override-batch-size <BATCH_SIZE> \
     --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
     --output-dir "<path-to-your-output-dir>" \
     model_configs/mcqa_model.yaml \
@@ -106,6 +112,7 @@ lighteval accelerate \
 lighteval accelerate \
     --eval-mode "lighteval" \
     --save-details \
+    --override-batch-size <BATCH_SIZE> \
     --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
     --output-dir "<path-to-your-output-dir>" \
     model_configs/quantized_model.yaml \
@@ -115,6 +122,7 @@ lighteval accelerate \
 lighteval accelerate \
     --eval-mode "dpo" \
     --save-details \
+    --override-batch-size <BATCH_SIZE> \
     --custom-tasks "community_tasks/mnlp_dpo_evals.py" \
     --output-dir "<path-to-your-output-dir>" \
     model_configs/dpo_model.yaml \
@@ -124,6 +132,7 @@ lighteval accelerate \
 lighteval accelerate \
     --eval-mode "rag" \
     --save-details \
+    --override-batch-size <BATCH_SIZE> \
     --custom-tasks "community_tasks/mnlp_mcqa_evals.py" \
     --output-dir "<path-to-your-output-dir>" \
     model_configs/rag_model.yaml \
