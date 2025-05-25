@@ -213,6 +213,7 @@ def accelerate(  # noqa C901
             rag_model_config.docs_name_or_path = config["rag_params"]["docs_name_or_path"]
             rag_model_config.top_k = config["rag_params"]["top_k"]
             rag_model_config.similarity_fn = config["rag_params"]["similarity_fn"]
+            rag_model_config.num_chunks = config["rag_params"]["num_chunks"]
 
     else:
         model_args_dict: dict = {k.split("=")[0]: k.split("=")[1] if "=" in k else True for k in model_args.split(",")}
