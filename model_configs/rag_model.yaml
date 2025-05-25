@@ -8,7 +8,7 @@ model:
     compile: false
   rag_params:
     embedding_model: "thenlper/gte-small" # Change this to your own embedding model name on huggingface hub
-    docs_name_or_path: "emilecornamusaz/RAG_documents" # Change this to your own document name or path on huggingface hub
+    docs_name_or_path: "m-ric/huggingface_doc" # Change this to your own document name or path on huggingface hub
     similarity_fn: cosine # Select the similarity function to use, options are: cosine, dot_product, max_inner_product, jaccard
     top_k: 20 # Choose the number of documents to retrieve
     num_chunks: 100000 # This is the limit we set for the number of chunks to retrieve from the document where each chunk is 512 tokens
