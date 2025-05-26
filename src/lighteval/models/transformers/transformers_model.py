@@ -44,6 +44,8 @@ from transformers import (
 from transformers.generation.utils import GenerateOutput, GenerationConfig
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 
+from optimum.quanto import QuantizedModelForCausalLM
+
 from lighteval.data import (
     GenerativeTaskDataset,
     LoglikelihoodDataset,
@@ -163,6 +165,7 @@ class TransformersModelConfig:
     quantization_config: Optional[BitsAndBytesConfig] = None
     trust_remote_code: bool = False
     use_chat_template: bool = False
+    load_in_optimum: bool = False
     compile: bool = False
     generation_parameters: GenerationParameters = None
     generation_config: GenerationConfig = None
@@ -267,6 +270,7 @@ class TransformersModel(LightevalModel):
         self.accelerator = config.accelerator
         self._max_length = self._init_max_length(config.max_length)
         self.use_chat_template = config.use_chat_template
+        self.load_in_optimum = config.load_in_optimum
 
         self._add_special_tokens = config.add_special_tokens if config.add_special_tokens is not None else False
         self._tokenizer = self._create_auto_tokenizer(config, env_config)
@@ -480,18 +484,28 @@ class TransformersModel(LightevalModel):
         if "quantization_config" not in pretrained_config.to_dict():
             kwargs["quantization_config"] = config.quantization_config
 
-        model = AutoModelForCausalLM.from_pretrained(
-            config.pretrained,
-            revision=config.revision + (f"/{config.subfolder}" if config.subfolder is not None else ""),
-            max_memory=max_memory,
-            device_map=device_map,
-            torch_dtype=torch_dtype,
-            trust_remote_code=config.trust_remote_code,
-            cache_dir=env_config.cache_dir,
-            offload_folder=env_config.cache_dir,
-            token=env_config.token,
-            **kwargs,
-        )
+        if self.load_in_optimum:
+            config.quantization_config
+            model = QuantizedModelForCausalLM.from_pretrained(
+                config.pretrained,
+                revision=config.revision + (f"/{config.subfolder}" if config.subfolder is not None else ""),
+                cache_dir=env_config.cache_dir,
+                token=env_config.token
+            )
+            model = model.to("cuda")
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                config.pretrained,
+                revision=config.revision + (f"/{config.subfolder}" if config.subfolder is not None else ""),
+                max_memory=max_memory,
+                device_map=device_map,
+                torch_dtype=torch_dtype,
+                trust_remote_code=config.trust_remote_code,
+                cache_dir=env_config.cache_dir,
+                offload_folder=env_config.cache_dir,
+                token=env_config.token,
+                **kwargs,
+            )
 
         def get_model_size(model):
             param_size = 0
@@ -506,13 +520,7 @@ class TransformersModel(LightevalModel):
             return size_mb
 
         model_size = get_model_size(model)
-
-        if config.quantization_config is not None and "quant_method" in config.quantization_config.to_dict():
-            logger.info(
-                f"Model loaded with quantization method {config.quantization_config.quant_method} has model size {model_size:.2f} MB"
-            )
-        else:
-            logger.info(f"Model loaded has model size {model_size:.2f} MB")
+        logger.info(f"Model loaded has model size {model_size:.2f} MB")
 
         return model
 
@@ -1873,8 +1881,8 @@ class TransformersModel(LightevalModel):
                     res.append(
                         RewardModelingResponse(
                             result=(chosen_score, rejected_score),
-                            policy_chosen_logps=policy_chosen_logps[ix].cpu().numpy().tolist(),
-                            policy_rejected_logps=policy_rejected_logps[ix].cpu().numpy().tolist()
+                            policy_chosen_logps=policy_chosen_logps[ix].float().cpu().numpy().tolist(),
+                            policy_rejected_logps=policy_rejected_logps[ix].float().cpu().numpy().tolist()
                         )
                     )
 
