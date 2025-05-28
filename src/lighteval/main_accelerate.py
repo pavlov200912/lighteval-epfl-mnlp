@@ -175,7 +175,6 @@ def accelerate(  # noqa C901
         args_dict["compile"] = bool(config["base_params"]["compile"])
         args_dict["dtype"] = config["base_params"]["dtype"]
         args_dict["accelerator"] = accelerator
-        args_dict["quantization_config"] = quantization_config
         args_dict["batch_size"] = override_batch_size
         args_dict["load_in_optimum"] = config["base_params"].get("load_in_optimum", False)
         args_dict["ref_free_norm"] = config["base_params"].get("ref_free_norm", "none")
