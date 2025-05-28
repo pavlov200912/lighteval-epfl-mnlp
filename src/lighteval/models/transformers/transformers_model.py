@@ -44,8 +44,6 @@ from transformers import (
 from transformers.generation.utils import GenerateOutput, GenerationConfig
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 
-from optimum.quanto import QuantizedModelForCausalLM
-
 from lighteval.data import (
     GenerativeTaskDataset,
     LoglikelihoodDataset,
@@ -484,15 +482,8 @@ class TransformersModel(LightevalModel):
         if "quantization_config" not in pretrained_config.to_dict():
             kwargs["quantization_config"] = config.quantization_config
 
-        if self.load_in_optimum:
-            config.quantization_config
-            model = QuantizedModelForCausalLM.from_pretrained(
-                config.pretrained,
-                revision=config.revision + (f"/{config.subfolder}" if config.subfolder is not None else ""),
-                cache_dir=env_config.cache_dir,
-                token=env_config.token
-            )
-            model = model.to("cuda")
+        if False:
+            1
         else:
             model = AutoModelForCausalLM.from_pretrained(
                 config.pretrained,
