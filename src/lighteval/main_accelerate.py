@@ -119,8 +119,7 @@ def accelerate(  # noqa C901
     from lighteval.models.model_input import GenerationParameters
     from lighteval.models.transformers.adapter_model import AdapterModelConfig
     from lighteval.models.transformers.delta_model import DeltaModelConfig
-    from lighteval.models.transformers.embed_model import EmbeddingModelConfig
-    from lighteval.models.transformers.transformers_model import BitsAndBytesConfig, TransformersModelConfig
+    from lighteval.models.transformers.transformers_model import TransformersModelConfig
     from lighteval.pipeline import EnvConfig, ParallelismManager, Pipeline, PipelineParameters, EvaluationMode
 
     accelerator = Accelerator(kwargs_handlers=[InitProcessGroupKwargs(timeout=timedelta(seconds=3000))])
@@ -166,14 +165,6 @@ def accelerate(  # noqa C901
         with open(model_args, "r") as f:
             config = yaml.safe_load(f)["model"]
 
-        # Creating optional quantization configuration
-        if config["base_params"]["dtype"] == "4bit":
-            quantization_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.float16)
-        elif config["base_params"]["dtype"] == "8bit":
-            quantization_config = BitsAndBytesConfig(load_in_8bit=True)
-        else:
-            quantization_config = None
-
         # We extract the model args
         args_dict = {k.split("=")[0]: k.split("=")[1] for k in config["base_params"]["model_args"].split(",")}
 
@@ -206,15 +197,6 @@ def accelerate(  # noqa C901
             raise ValueError("You can't specify a base model if you are not using delta/adapter weights")
         else:
             model_config = TransformersModelConfig(**args_dict)
-
-        if eval_mode == "rag":
-            assert "rag_params" in config, "ERROR: rag_params must be specified in the config file!"
-            rag_model_config = EmbeddingModelConfig(**args_dict)
-            rag_model_config.pretrained = config["rag_params"]["embedding_model"]
-            rag_model_config.docs_name_or_path = config["rag_params"]["docs_name_or_path"]
-            rag_model_config.top_k = config["rag_params"]["top_k"]
-            rag_model_config.similarity_fn = config["rag_params"]["similarity_fn"]
-            rag_model_config.num_chunks = config["rag_params"]["num_chunks"]
 
     else:
         model_args_dict: dict = {k.split("=")[0]: k.split("=")[1] if "=" in k else True for k in model_args.split(",")}
