@@ -84,7 +84,7 @@ dependencies = [
     "langchain-huggingface>=0.1.2",
     "langchain-community>=0.3.21",
     "sentence-transformers",
-    "faiss-gpu-cu12==1.10.0",
+    "faiss-cpu",
     "latex2sympy2_extended"
 ]
 
